@@ -176,7 +176,7 @@
         "default": 5,
         "required": false,
         "description": "The amount of requests that are allowed per second."
-      },
+      }
     }
   }
 }

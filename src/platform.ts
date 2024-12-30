@@ -8,12 +8,10 @@ import type {
   HAP,
 } from 'homebridge';
 
-import { ExamplePlatformAccessory } from './platformAccessory.js';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-
 import { HueSyncBoxPlatformConfig } from './lib/config';
 import { PhilipsHueSyncBoxClient } from './lib/philips-hue-sync-box-client';
 import Bottleneck from 'bottleneck';
+import { SyncBoxDevice } from './device';
 
 /**
  * HomebridgePlatform
@@ -38,13 +36,14 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly client: PhilipsHueSyncBoxClient;
   public readonly limiter: Bottleneck;
   public readonly api: API;
+  private device: SyncBoxDevice | undefined;
 
   constructor(
     public readonly logger: Logging,
     public readonly platformConfig: HueSyncBoxPlatformConfig,
-    public readonly apiInput: API,
+    public readonly apiInput: API
   ) {
-    if(!apiInput) {
+    if (!apiInput) {
       throw new Error('API is not defined');
     }
     this.config = platformConfig;
@@ -52,7 +51,9 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     this.log = logger ?? console;
     // Checks if all required information is provided
     if (!this.config.syncBoxIpAddress || !this.config.syncBoxApiAccessToken) {
-      this.log.error('Missing required configuration parameters syncBoxIpAddress or syncBoxApiAccessToken');
+      this.log.error(
+        'Missing required configuration parameters syncBoxIpAddress or syncBoxApiAccessToken'
+      );
       throw new Error('Missing required configuration parameters');
     }
     this.Service = this.api.hap.Service;
@@ -63,7 +64,6 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       maxConcurrent: 1,
       minTime: 1000.0 / this.config.requestsPerSecond,
     });
-
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -98,82 +98,11 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     // EXAMPLE ONLY
     // A real plugin you would discover accessories from the local network, cloud services
     // or a user-defined array in the platform config.
-    await this.client.getState();
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-      {
-        // This is an example of a device which uses a Custom Service
-        exampleUniqueId: 'IJKL',
-        exampleDisplayName: 'Backyard',
-        CustomService: 'AirPressureSensor',
-      },
-    ];
-
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
-
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
-      const existingAccessory = this.accessories.get(uuid);
-
-      if (existingAccessory) {
-        // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
-
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
-
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
-        // remove platform accessories when no longer present
-        // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
-
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
-
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
-
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
-
-        // link the accessory to your platform
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-      }
-
-      // push into discoveredCacheUUIDs
-      this.discoveredCacheUUIDs.push(uuid);
-    }
-
-    // you can also deal with accessories from the cache which are no longer present by removing them from Homebridge
-    // for example, if your plugin logs into a cloud account to retrieve a device list, and a user has previously removed a device
-    // from this cloud account, then this device will no longer be present in the device list but will still be in the Homebridge cache
-    for (const [uuid, accessory] of this.accessories) {
-      if (!this.discoveredCacheUUIDs.includes(uuid)) {
-        this.log.info('Removing existing accessory from cache:', accessory.displayName);
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-      }
-    }
+    const state = await this.client.getState();
+    this.device = new SyncBoxDevice(this, state);
+    this.limiter.schedule(async () => {
+      const state = await this.client.getState();
+      this.device?.update(state);
+    }, this.config.updateInterval);
   }
 }
