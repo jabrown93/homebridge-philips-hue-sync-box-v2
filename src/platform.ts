@@ -12,7 +12,7 @@ import type {
 import { HueSyncBoxPlatformConfig } from './config';
 import Bottleneck from 'bottleneck';
 import { SyncBoxDevice } from './device';
-import { SyncBoxClient } from './client';
+import { SyncBoxClient } from './lib/client';
 
 export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -70,6 +70,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   async discoverDevices() {
     const state = await this.client.getState();
     this.device = new SyncBoxDevice(this, state);
+    this.device.init();
     this.limiter.schedule(async () => {
       const state = await this.client.getState();
       this.device?.update(state);

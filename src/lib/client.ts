@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
-import { HueSyncBoxPlatform } from './platform';
-import { State } from './state';
+import { HueSyncBoxPlatform } from '../platform';
+import { State } from '../state';
 import * as https from 'node:https';
 
 export class SyncBoxClient {
