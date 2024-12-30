@@ -4,21 +4,17 @@ import { State } from './state';
 import * as https from 'node:https';
 
 export class SyncBoxClient {
-  private readonly platform: HueSyncBoxPlatform;
+  constructor(private readonly platform: HueSyncBoxPlatform) {}
 
-  constructor(platform: HueSyncBoxPlatform) {
-    this.platform = platform;
-  }
-
-  public async getState(): Promise<State> {
+  public getState(): Promise<State> {
     return this.sendRequest<State>('GET', '');
   }
 
-  public async updateExecution(execution: object): Promise<void> {
+  public updateExecution(execution: object): Promise<void> {
     return this.sendRequest<void>('PUT', 'execution', execution);
   }
 
-  public async updateHue(hue: object): Promise<void> {
+  public updateHue(hue: object): Promise<void> {
     return this.sendRequest<void>('PUT', 'hue', hue);
   }
 
@@ -27,39 +23,30 @@ export class SyncBoxClient {
     path: string,
     body?: object
   ): Promise<T> {
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false,
-    });
     const url = `https://${this.platform.config.syncBoxIpAddress}/api/v1/${path}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.platform.config.syncBoxApiAccessToken}`,
-    };
-
     const options = {
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.platform.config.syncBoxApiAccessToken}`,
+      },
       method,
       body: body ? JSON.stringify(body) : null,
-      agent: httpsAgent,
+      agent: new https.Agent({ rejectUnauthorized: false }),
     };
-    this.platform.log.debug('Request to Sync Box:', url, JSON.stringify(options));
 
-    return fetch(url, options)
-      .then(res => {
-        if (!res.ok) {
-          this.platform.log.error(
-            `Error: ${res.status} - ${res.statusText}. ${JSON.stringify(res.json())} `
-          );
-          throw new Error(`Error: ${res.status} - ${res.statusText}`);
-        }
-        if (res.body) {
-          return res.json() as T;
-        }
-        return null as T;
-      })
-      .catch(error => {
-        this.platform.log.error('Error:', error);
-        throw error;
-      });
+    this.platform.log.debug(
+      'Request to Sync Box:',
+      url,
+      JSON.stringify(options)
+    );
+
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      this.platform.log.error(
+        `Error: ${res.status} - ${res.statusText}. ${JSON.stringify(await res.json())}`
+      );
+      throw new Error(`Error: ${res.status} - ${res.statusText}`);
+    }
+    return res.body ? ((await res.json()) as T) : (null as T);
   }
 }

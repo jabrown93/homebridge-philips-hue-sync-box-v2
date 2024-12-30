@@ -15,5 +15,5 @@
     "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true
   },
-  "include": [".eslintrc.json", "homebridge-ui", "src/**/*.ts"],
+  "include": [".eslintrc.json", "homebridge-ui", "src/**/*.ts"]
 }
