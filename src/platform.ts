@@ -71,7 +71,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     const state = await this.client.getState();
     this.device = new SyncBoxDevice(this, state);
     this.device.init();
-    this.limiter.schedule(async () => {
+    await this.limiter.schedule(async () => {
       const state = await this.client.getState();
       this.device?.update(state);
     }, this.config.updateInterval);

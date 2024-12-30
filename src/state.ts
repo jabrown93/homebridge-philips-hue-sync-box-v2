@@ -70,6 +70,7 @@ export interface Execution {
   hdmiSource: string;
   hueTarget: string;
   brightness: number;
+  intensity: string;
   lastSyncMode: string;
   video: ExecutionVideo;
   game: ExecutionGame;

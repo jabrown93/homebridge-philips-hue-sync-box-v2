@@ -1,17 +1,23 @@
 import { HueSyncBoxPlatform } from './platform';
-import { HdmiInput, State } from './state';
-import type { PlatformAccessory, Service, UnknownContext } from 'homebridge';
+import { Execution, HdmiInput, State } from './state';
+import type {
+  PlatformAccessory,
+  Service,
+  UnknownContext,
+  Characteristic,
+  CharacteristicValue,
+} from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 export class SyncBoxDevice {
   private readonly UUIDGen;
-  private readonly Accessory;
-  private readonly Service;
-  private readonly Characteristic;
+  private readonly Accessory: typeof PlatformAccessory;
+  private readonly Service: typeof Service;
+  private readonly Characteristic: typeof Characteristic;
   private readonly platform: HueSyncBoxPlatform;
   private state: State;
   private externalAccessories: PlatformAccessory[] = [];
-  private unusedDeviceAccessories: Map<string, PlatformAccessory>;
+  private readonly unusedDeviceAccessories: Map<string, PlatformAccessory>;
   private newDeviceAccessories: PlatformAccessory[] = [];
   private deviceAccessories: PlatformAccessory[] = [];
   private mainAccessory: PlatformAccessory | undefined;
@@ -29,10 +35,43 @@ export class SyncBoxDevice {
   private readonly _powersave = 'powersave';
   private readonly _passthrough = 'passthrough';
   private readonly _video = 'video';
-  private readonly _music = 'music';
-  private readonly _game = 'game';
   private readonly _lightbulb = 'lightbulb';
   private readonly _switch = 'switch';
+  private readonly tvAccessoryTypesToCategory: object;
+  private accessoryUuidSuffix: object = {
+    TVAccessory: '-T',
+    ModeTVAccessory: '-M',
+    IntensityModeTVAccessory: '-I',
+    EntertainmentModeTVAccessory: '-E',
+  };
+
+  private readonly intensityToNumber: Map<string, number> = new Map([
+    ['subtle', 1],
+    ['moderate', 2],
+    ['high', 3],
+    ['intense', 4],
+  ]);
+
+  private readonly numberToIntensity: Map<number, string> = new Map([
+    [1, 'subtle'],
+    [2, 'moderate'],
+    [3, 'high'],
+    [4, 'intense'],
+  ]);
+
+  private readonly modeToNumber: Map<string, number> = new Map([
+    ['video', 1],
+    ['music', 2],
+    ['game', 3],
+    ['passthrough', 4],
+  ]);
+
+  private readonly numberToMode: Map<number, string> = new Map([
+    [1, 'video'],
+    [2, 'music'],
+    [3, 'game'],
+    [4, 'passthrough'],
+  ]);
 
   constructor(platform: HueSyncBoxPlatform, state: State) {
     this.platform = platform;
@@ -48,6 +87,13 @@ export class SyncBoxDevice {
     if (!state.device) {
       throw new Error('Device is not defined');
     }
+
+    this.tvAccessoryTypesToCategory = {
+      settopbox: this.platform.api.hap.Categories.TV_SET_TOP_BOX,
+      tvstick: this.platform.api.hap.Categories.TV_STREAMING_STICK,
+      audioreceiver: this.platform.api.hap.Categories.AUDIO_RECEIVER,
+      television: this.platform.api.hap.Categories.TELEVISION,
+    };
   }
 
   private readonly _lightBulbAccessory = 'LightBulbAccessory';
@@ -84,7 +130,7 @@ export class SyncBoxDevice {
   private readonly _switchAccessory = 'SwitchAccessory';
 
   private getSwitchAccessory(): PlatformAccessory | null {
-    let switchAccessory;
+    let switchAccessory: PlatformAccessory;
     if (this.platform.config.baseAccessory === this._switch) {
       return null;
     }
@@ -116,7 +162,7 @@ export class SyncBoxDevice {
     const switchAccessory = this.getSwitchAccessory();
 
     // Gets the tv accessory
-    const tvAccessory = this.getTcAccessory();
+    const tvAccessory = this.getTvAccessory();
 
     // Gets the tv accessory
     const modeTvAccessory = this.getModeTvAccessory();
@@ -149,8 +195,7 @@ export class SyncBoxDevice {
     );
 
     // Updates the accessory information
-    for (let i = 0; i < this.deviceAccessories.length; i++) {
-      const deviceAccessory = this.deviceAccessories[i];
+    for (const deviceAccessory of this.deviceAccessories) {
       let accessoryInformationService = deviceAccessory.getService(
         this.Service.AccessoryInformation
       );
@@ -167,33 +212,16 @@ export class SyncBoxDevice {
           this.state.device.firmwareVersion
         );
 
-      // Applies a custom serial number as otherwise issues with matching in HomeKit could occur
-      if (deviceAccessory.context.kind === 'TVAccessory') {
-        accessoryInformationService.setCharacteristic(
-          this.Characteristic.SerialNumber,
-          this.state.device.uniqueId + '-T'
-        );
-      } else if (deviceAccessory.context.kind === 'ModeTVAccessory') {
-        accessoryInformationService.setCharacteristic(
-          this.Characteristic.SerialNumber,
-          this.state.device.uniqueId + '-M'
-        );
-      } else if (deviceAccessory.context.kind === 'IntensityTVAccessory') {
-        accessoryInformationService.setCharacteristic(
-          this.Characteristic.SerialNumber,
-          this.state.device.uniqueId + '-I'
-        );
-      } else if (deviceAccessory.context.kind === 'EntertainmentTVAccessory') {
-        accessoryInformationService.setCharacteristic(
-          this.Characteristic.SerialNumber,
-          this.state.device.uniqueId + '-E'
-        );
-      } else {
-        accessoryInformationService.setCharacteristic(
-          this.Characteristic.SerialNumber,
-          this.state.device.uniqueId
-        );
+      const kind = deviceAccessory.context.kind;
+      let suffix = '';
+      if (kind in this.accessoryUuidSuffix) {
+        suffix = this.accessoryUuidSuffix[kind];
       }
+
+      accessoryInformationService.setCharacteristic(
+        this.Characteristic.SerialNumber,
+        this.state.device.uniqueId + suffix
+      );
     }
 
     // Handles the lightbulb accessory if it is enabled
@@ -222,1202 +250,389 @@ export class SyncBoxDevice {
     this.update(this.state);
   }
 
-  private handleTv(tvAccessory: PlatformAccessory) {
-    if (tvAccessory) {
-      // Updates tv service
-      let tvService = tvAccessory.getServiceById(this.Service.Television, 'TV');
-      if (!tvService) {
-        tvService = tvAccessory.addService(this.Service.Television, 'TV', 'TV');
-
-        // Sets the TV name
-        if (this.mainAccessory) {
-          tvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.mainAccessory.context.tvAccessoryConfiguredName ||
-              this.state.device.name
-          );
-          tvService
-            .getCharacteristic(this.Characteristic.ConfiguredName)
-            .on('set', (value, callback) => {
-              // @ts-expect-error already checked
-              this.mainAccessory.context.tvAccessoryConfiguredName = value;
-              callback(null);
-            });
-        } else {
-          tvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.state.device.name
-          );
-        }
-      }
-
-      // Register HDMI sources
-      const hdmiInputServices: Service[] = [];
-      for (let i = 1; i <= 4; i++) {
-        let hdmiInputService = tvAccessory.getServiceById(
-          this.Service.InputSource,
-          'HDMI ' + i
-        );
-        if (!hdmiInputService) {
-          hdmiInputService = tvAccessory.addService(
-            this.Service.InputSource,
-            'hdmi' + i,
-            'HDMI ' + i
-          );
-
-          // Sets the TV name
-          const hdmiState: HdmiInput = this.state.hdmi[`input${i}`];
-          const hdmiName = hdmiState.name || 'HDMI ' + i;
-
-          hdmiInputService
-            .setCharacteristic(this.Characteristic.ConfiguredName, hdmiName)
-            .setCharacteristic(
-              this.Characteristic.IsConfigured,
-              this.Characteristic.IsConfigured.CONFIGURED
-            )
-            .setCharacteristic(
-              this.Characteristic.CurrentVisibilityState,
-              this.Characteristic.CurrentVisibilityState.SHOWN
-            )
-            .setCharacteristic(
-              this.Characteristic.TargetVisibilityState,
-              this.Characteristic.TargetVisibilityState.SHOWN
-            );
-        }
-        hdmiInputService
-          .setCharacteristic(this.Characteristic.Identifier, i)
-          .setCharacteristic(
-            this.Characteristic.InputSourceType,
-            this.Characteristic.InputSourceType.HDMI
-          );
-
-        // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
-        tvService.addLinkedService(hdmiInputService);
-        hdmiInputServices.push(hdmiInputService);
-      }
-
-      // Sets sleep discovery characteristic (which is always discoverable as Homebridge is always running)
-      tvService.setCharacteristic(
-        this.Characteristic.SleepDiscoveryMode,
-        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
-      );
-
-      // Handles on/off events
-      tvService
-        .getCharacteristic(this.Characteristic.Active)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            tvService.getCharacteristic(this.Characteristic.Active).value ===
-            value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
-        });
-
-      // Handles input source changes
-      tvService
-        .getCharacteristic(this.Characteristic.ActiveIdentifier)
-        .on('set', (value, callback) => {
-          // Saves the changes
-          this.platform.log.debug('Switch hdmi source to input' + value);
-          this.platform.limiter.schedule(() => {
-            return this.platform.client
-              .updateExecution({
-                hdmiSource: 'input' + value,
-              })
-              .catch(() => {
-                this.platform.log.debug(
-                  'Failed to switch hdmi source to input' + value
-                );
-              });
-          });
-
-          // Performs the callback
-          callback(null);
-        });
-
-      // Handles showing/hiding of sources
-      for (let i = 0; i < hdmiInputServices.length; i++) {
-        hdmiInputServices[i]
-          .getCharacteristic(this.Characteristic.TargetVisibilityState)
-          .on('set', (value, callback) => {
-            if (value === this.Characteristic.TargetVisibilityState.SHOWN) {
-              hdmiInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.SHOWN
-              );
-            } else {
-              hdmiInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.HIDDEN
-              );
-            }
-
-            // Performs the callback
-            callback(null);
-          });
-      }
-
-      // Handles remote key input
-      tvService
-        .getCharacteristic(this.Characteristic.RemoteKey)
-        .on('set', (value, callback) => {
-          this.platform.log.debug('Remote key pressed: ' + value);
-
-          let mode;
-          switch (value) {
-            case this.Characteristic.RemoteKey.ARROW_UP:
-              this.platform.log.debug('Increase brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.min(
-                      200,
-                      this.state.execution.brightness + 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to increase brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_DOWN:
-              this.platform.log.debug('Decrease brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.max(
-                      0,
-                      this.state.execution.brightness - 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to increase brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_LEFT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'subtle',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_RIGHT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'intense',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.SELECT:
-              this.platform.log.debug('Toggle mode');
-              switch (this.state.execution.mode) {
-                case this._video:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._music })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._music:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._game })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._game:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        mode: this._passthrough,
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._passthrough:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._video })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              this.platform.log.debug('Toggle switch state');
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: this.platform.config.defaultOffMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              } else {
-                let onMode = this.platform.config.defaultOnMode;
-                if (onMode === 'lastSyncMode') {
-                  if (
-                    this.state &&
-                    this.state.execution &&
-                    this.state.execution.lastSyncMode
-                  ) {
-                    onMode = this.state.execution.lastSyncMode;
-                  } else {
-                    onMode = this._video;
-                  }
-                }
-                this.platform.limiter.schedule(() => {
-                  return this.platform.client
-                    .updateExecution({
-                      mode: onMode,
-                    })
-                    .catch(() => {
-                      this.platform.log.debug('Failed to toggle switch state');
-                    });
-                });
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.INFORMATION:
-              this.platform.log.debug('Toggle hdmi source');
-              switch (this.state.execution.hdmiSource) {
-                case 'input1':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input2',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input2':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input3',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input3':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input4',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input4':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input1',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-              }
-              break;
-          }
-
-          // Performs the callback
-          callback(null);
-        });
-
-      // Stores the tv service
-      this.tvService = tvService;
-
-      // Handles the lightbulb accessory if it is enabled
-      if (this.platform.config.tvAccessoryLightbulb) {
-        // Updates the light bulb service
-
-        let tvAccessoryLightBulbService = tvAccessory.getServiceById(
-          this.Service.Lightbulb,
-          'TV'
-        );
-        if (!tvAccessoryLightBulbService) {
-          tvAccessoryLightBulbService = tvAccessory.addService(
-            this.Service.Lightbulb,
-            'TV',
-            'TV'
-          );
-        }
-
-        // Stores the light bulb service
-        this.tvAccessoryLightBulbService = tvAccessoryLightBulbService;
-
-        // Subscribes for changes of the on characteristic
-        tvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.On)
-          .on('set', (value, callback) => {
-            // Ignores changes if the new value equals the old value
-            if (
-              tvAccessoryLightBulbService.getCharacteristic(
-                this.Characteristic.On
-              ).value === value
-            ) {
-              if (value) {
-                this.platform.log.debug('Switch state is already ON');
-              } else {
-                this.platform.log.debug('Switch state is already OFF');
-              }
-              callback(null);
-              return;
-            }
-
-            // Saves the changes
-            if (value) {
-              this.platform.log.debug('Switch state to ON');
-              let onMode = this.platform.config.defaultOnMode;
-              if (onMode === 'lastSyncMode') {
-                if (
-                  this.state &&
-                  this.state.execution &&
-                  this.state.execution.lastSyncMode
-                ) {
-                  onMode = this.state.execution.lastSyncMode;
-                } else {
-                  onMode = this._video;
-                }
-              }
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: onMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to ON');
-                  });
-              });
-            } else {
-              this.platform.log.debug('Switch state to OFF');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: this.platform.config.defaultOffMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to OFF');
-                  });
-              });
-            }
-
-            // Performs the callback
-            callback(null);
-          });
-
-        // Subscribes for changes of the brightness characteristic
-        tvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.Brightness)
-          .on('set', (value, callback) => {
-            // Saves the changes
-            this.platform.log.debug('Switch brightness to ' + value);
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  brightness: Math.round(((value as number) / 100.0) * 200),
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-
-            // Performs the callback
-            callback(null);
-          });
-      }
+  private handleTv(tvAccessory: PlatformAccessory | null) {
+    if (!tvAccessory) {
+      return;
     }
-  }
-
-  private handleModeTv(modeTvAccessory) {
-    if (modeTvAccessory) {
-      // Updates tv service
-      let modeTvService = modeTvAccessory.getServiceById(
-        this.Service.Television,
-        'ModeTVAccessory'
-      );
-      if (!modeTvService) {
-        modeTvService = modeTvAccessory.addService(
-          this.Service.Television,
-          'Mode',
-          'ModeTVAccessory'
-        );
-
-        // Sets the TV name
-        if (this.mainAccessory) {
-          modeTvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.mainAccessory.context.modeTvAccessoryConfiguredName ||
-              this.state.device.name
-          );
-          modeTvService
-            .getCharacteristic(this.Characteristic.ConfiguredName)
-            .on('set', (value, callback) => {
-              // @ts-expect-error already checked
-              this.mainAccessory.context.modeTvAccessoryConfiguredName = value;
-              callback(null);
-            });
-        } else {
-          modeTvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.state.device.name
-          );
-        }
-      }
-
-      // Register mode input sources
-      const modeInputServices: Service[] = [];
-      const modes = [
-        'none',
-        this._video,
-        this._music,
-        this._game,
-        this._passthrough,
-      ];
-      for (let i = 1; i <= 4; i++) {
-        let modeInputService = modeTvAccessory.getServiceById(
-          this.Service.InputSource,
-          'MODE ' + i
-        );
-        if (!modeInputService) {
-          modeInputService = modeTvAccessory.addService(
-            this.Service.InputSource,
-            'mode' + i,
-            'MODE ' + i
-          );
-
-          // Sets the TV name
-          modeInputService
-            .setCharacteristic(this.Characteristic.ConfiguredName, modes[i])
-            .setCharacteristic(
-              this.Characteristic.IsConfigured,
-              this.Characteristic.IsConfigured.CONFIGURED
-            )
-            .setCharacteristic(
-              this.Characteristic.CurrentVisibilityState,
-              this.Characteristic.CurrentVisibilityState.SHOWN
-            )
-            .setCharacteristic(
-              this.Characteristic.TargetVisibilityState,
-              this.Characteristic.TargetVisibilityState.SHOWN
-            );
-        }
-        modeInputService
-          .setCharacteristic(this.Characteristic.Identifier, i)
-          .setCharacteristic(
-            this.Characteristic.InputSourceType,
-            this.Characteristic.InputSourceType.HDMI
-          );
-
-        // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
-        modeTvService.addLinkedService(modeInputService);
-        modeInputServices.push(modeInputService);
-      }
-
-      // Sets sleep discovery characteristic (which is always discoverable as Homebridge is always running)
-      modeTvService.setCharacteristic(
-        this.Characteristic.SleepDiscoveryMode,
-        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+    const tvService = this.getTvService(tvAccessory);
+    const hdmiInputServices: Service[] = [];
+    for (let i = 1; i <= 4; i++) {
+      // Sets the TV name
+      const hdmiState: HdmiInput = this.state.hdmi[`input${i}`];
+      const hdmiName = hdmiState.name || 'HDMI ' + i;
+      const hdmiInputService = this.getInputService(
+        tvAccessory,
+        hdmiName,
+        hdmiName
       );
 
-      // Handles on/off events
-      modeTvService
-        .getCharacteristic(this.Characteristic.Active)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            modeTvService.getCharacteristic(this.Characteristic.Active)
-              .value === value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
+      // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
+      tvService.addLinkedService(hdmiInputService);
+      hdmiInputServices.push(hdmiInputService);
+    }
+    tvService.setCharacteristic(
+      this.Characteristic.SleepDiscoveryMode,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+    );
+    tvService
+      .getCharacteristic(this.Characteristic.Active)
+      .onSet(this.setServiceActive(tvService).bind(this));
+    tvService
+      .getCharacteristic(this.Characteristic.ActiveIdentifier)
+      .onSet(async value => {
+        return await this.updateExecution({
+          hdmiSource: 'input' + value,
         });
+      });
 
-      // Handles input source changes
-      modeTvService
-        .getCharacteristic(this.Characteristic.ActiveIdentifier)
-        .on('set', (value, callback) => {
-          // Saves the changes
-          let mode = '';
-          switch (value) {
-            case 1:
-              mode = this._video;
-              break;
-            case 2:
-              mode = this._music;
-              break;
-            case 3:
-              mode = this._game;
-              break;
-            case 4:
-              mode = this._passthrough;
-              break;
-          }
-          this.platform.log.debug('Switch mode to ' + mode);
-          this.platform.limiter.schedule(() => {
-            return this.platform.client
-              .updateExecution({
-                mode: mode,
-              })
-              .catch(() => {
-                this.platform.log.debug('Failed to switch mode to ' + mode);
-              });
-          });
+    for (let i = 0; i < hdmiInputServices.length; i++) {
+      hdmiInputServices[i]
+        .getCharacteristic(this.Characteristic.TargetVisibilityState)
+        .onSet(this.setVisibility(hdmiInputServices[i]));
+    }
+    tvService
+      .getCharacteristic(this.Characteristic.RemoteKey)
+      .onSet(this.handleRemoteButton.bind(this));
+    this.tvService = tvService;
+    if (this.platform.config.tvAccessoryLightbulb) {
+      // Updates the light bulb service
 
-          // Performs the callback
-          callback(null);
-        });
-
-      // Handles showing/hiding of sources
-      for (let i = 0; i < modeInputServices.length; i++) {
-        modeInputServices[i]
-          .getCharacteristic(this.Characteristic.TargetVisibilityState)
-          .on('set', (value, callback) => {
-            if (value === this.Characteristic.TargetVisibilityState.SHOWN) {
-              modeInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.SHOWN
-              );
-            } else {
-              modeInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.HIDDEN
-              );
-            }
-
-            // Performs the callback
-            callback(null);
-          });
-      }
-
-      // Handles remote key input
-      modeTvService
-        .getCharacteristic(this.Characteristic.RemoteKey)
-        .on('set', (value, callback) => {
-          this.platform.log.debug('Remote key pressed: ' + value);
-
-          let mode;
-          switch (value) {
-            case this.Characteristic.RemoteKey.ARROW_UP:
-              this.platform.log.debug('Increase brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.min(
-                      200,
-                      this.state.execution.brightness + 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to increase brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_DOWN:
-              this.platform.log.debug('Decrease brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.max(
-                      0,
-                      this.state.execution.brightness - 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to decrease brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_LEFT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'subtle',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_RIGHT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'intense',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.SELECT:
-              this.platform.log.debug('Toggle mode');
-              switch (this.state.execution.mode) {
-                case this._video:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._music })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._music:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._game })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._game:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        mode: this._passthrough,
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._passthrough:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._video })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              this.platform.log.debug('Toggle switch state');
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: this.platform.config.defaultOffMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              } else {
-                let onMode = this.platform.config.defaultOnMode;
-                if (onMode === 'lastSyncMode') {
-                  if (
-                    this.state &&
-                    this.state.execution &&
-                    this.state.execution.lastSyncMode
-                  ) {
-                    onMode = this.state.execution.lastSyncMode;
-                  } else {
-                    onMode = this._video;
-                  }
-                }
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: onMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.INFORMATION:
-              this.platform.log.debug('Toggle hdmi source');
-              switch (this.state.execution.hdmiSource) {
-                case 'input1':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input2',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input2':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input3',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input3':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input4',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input4':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input1',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-              }
-              break;
-          }
-
-          // Performs the callback
-          callback(null);
-        });
-
-      // Stores the tv service
-      this.modeTvService = modeTvService;
-
-      // Handles the lightbulb accessory if it is enabled
-      if (this.platform.config.modeTvAccessoryLightbulb) {
-        // Updates the light bulb service
-
-        let modeTvAccessoryLightBulbService = modeTvAccessory.getServiceById(
+      // @ts-expect-error // already checked
+      let tvAccessoryLightBulbService = tvAccessory.getServiceById(
+        this.Service.Lightbulb
+      );
+      if (!tvAccessoryLightBulbService) {
+        tvAccessoryLightBulbService = tvAccessory.addService(
           this.Service.Lightbulb
         );
-        if (!modeTvAccessoryLightBulbService) {
-          modeTvAccessoryLightBulbService = modeTvAccessory.addService(
-            this.Service.Lightbulb
-          );
+      }
+
+      // Stores the light bulb service
+      this.tvAccessoryLightBulbService = tvAccessoryLightBulbService;
+
+      // Subscribes for changes of the on characteristic
+      tvAccessoryLightBulbService
+        .getCharacteristic(this.Characteristic.On)
+        .onSet(this.setServiceActive(tvAccessoryLightBulbService).bind(this));
+
+      // Subscribes for changes of the brightness characteristic
+      tvAccessoryLightBulbService
+        .getCharacteristic(this.Characteristic.Brightness)
+        .onSet(this.setBrightness.bind(this));
+    }
+  }
+
+  private setVisibility(service: Service) {
+    return (value: CharacteristicValue) => {
+      service.setCharacteristic(
+        this.Characteristic.CurrentVisibilityState,
+        value
+      );
+    };
+  }
+
+  private async setBrightness(value: CharacteristicValue) {
+    this.platform.log.debug('Switch brightness to ' + value);
+    await this.updateExecution({
+      brightness: Math.round(((value as number) / 100.0) * 200),
+    });
+  }
+
+  private setServiceActive(service: Service) {
+    return async (value: CharacteristicValue) => {
+      const currentVal =
+        service.getCharacteristic(this.Characteristic.Active).value ||
+        service.getCharacteristic(this.Characteristic.On).value;
+      // Ignores changes if the new value equals the old value
+      if (currentVal === value) {
+        return;
+      }
+      let mode: string;
+      // Saves the changes
+      if (value) {
+        this.platform.log.debug('Switch state to ON');
+        mode = this.platform.config.defaultOnMode;
+        if (mode === 'lastSyncMode') {
+          mode = this?.state?.execution?.lastSyncMode || this._video;
         }
+      } else {
+        this.platform.log.debug('Switch state to OFF');
+        mode = this.platform.config.defaultOffMode;
+      }
+      await this.updateExecution({
+        mode,
+      });
+    };
+  }
 
-        // Stores the light bulb service
-        this.modeTvAccessoryLightBulbService = modeTvAccessoryLightBulbService;
+  private getTvService(tvAccessory: PlatformAccessory<UnknownContext>) {
+    let tvService = tvAccessory.getServiceById(this.Service.Television, 'TV');
+    if (!tvService) {
+      tvService = tvAccessory.addService(this.Service.Television, 'TV', 'TV');
 
-        // Subscribes for changes of the on characteristic
-        modeTvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.On)
-          .on('set', (value, callback) => {
-            // Ignores changes if the new value equals the old value
+      // Sets the TV name
+      if (this.mainAccessory) {
+        tvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.mainAccessory.context.tvAccessoryConfiguredName ||
+            this.state.device.name
+        );
+        tvService
+          .getCharacteristic(this.Characteristic.ConfiguredName)
+          .onSet(value => {
+            // @ts-expect-error already checked
+            this.mainAccessory.context.tvAccessoryConfiguredName = value;
+          });
+      } else {
+        tvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.state.device.name
+        );
+      }
+    }
+    return tvService;
+  }
+
+  private handleModeTv(modeTvAccessory: PlatformAccessory | null) {
+    if (!modeTvAccessory) {
+      return;
+    }
+    let modeTvService = modeTvAccessory.getServiceById(
+      this.Service.Television,
+      'ModeTVAccessory'
+    );
+    if (!modeTvService) {
+      modeTvService = modeTvAccessory.addService(
+        this.Service.Television,
+        'Mode',
+        'ModeTVAccessory'
+      );
+
+      // Sets the TV name
+      if (this.mainAccessory) {
+        modeTvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.mainAccessory.context.modeTvAccessoryConfiguredName ||
+            this.state.device.name
+        );
+        modeTvService
+          .getCharacteristic(this.Characteristic.ConfiguredName)
+          .onSet(value => {
+            // @ts-expect-error already checked
+            this.mainAccessory.context.modeTvAccessoryConfiguredName = value;
+          });
+      } else {
+        modeTvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.state.device.name
+        );
+      }
+    }
+    const modeInputServices: Service[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const position = 'MODE ' + i;
+      const name = this.numberToMode[i];
+      const modeInputService = this.getInputService(
+        modeTvAccessory,
+        name,
+        position
+      );
+      // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
+      modeTvService.addLinkedService(modeInputService);
+      modeInputServices.push(modeInputService);
+    }
+    modeTvService.setCharacteristic(
+      this.Characteristic.SleepDiscoveryMode,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+    );
+    modeTvService
+      .getCharacteristic(this.Characteristic.Active)
+      .onSet(this.setServiceActive(modeTvService).bind(this));
+    modeTvService
+      .getCharacteristic(this.Characteristic.ActiveIdentifier)
+      .onSet(async (value: CharacteristicValue) => {
+        const mode = this.numberToMode[value as number];
+        this.platform.log.debug('Switch mode to ' + mode);
+        return await this.updateExecution({
+          mode,
+        });
+      });
+    this.updateSources(modeInputServices);
+    modeTvService
+      .getCharacteristic(this.Characteristic.RemoteKey)
+      .onSet(this.handleRemoteButton);
+    this.modeTvService = modeTvService;
+    if (this.platform.config.modeTvAccessoryLightbulb) {
+      // Updates the light bulb service
+      // @ts-expect-error // already checked
+      let modeTvAccessoryLightBulbService = modeTvAccessory.getServiceById(
+        this.Service.Lightbulb
+      );
+      if (!modeTvAccessoryLightBulbService) {
+        modeTvAccessoryLightBulbService = modeTvAccessory.addService(
+          this.Service.Lightbulb
+        );
+      }
+
+      // Stores the light bulb service
+      this.modeTvAccessoryLightBulbService = modeTvAccessoryLightBulbService;
+
+      // Subscribes for changes of the on characteristic
+      modeTvAccessoryLightBulbService
+        .getCharacteristic(this.Characteristic.On)
+        .onSet(
+          this.setServiceActive(modeTvAccessoryLightBulbService).bind(this)
+        );
+
+      // Subscribes for changes of the brightness characteristic
+      modeTvAccessoryLightBulbService
+        .getCharacteristic(this.Characteristic.Brightness)
+        .onSet(this.setBrightness.bind(this));
+    }
+  }
+
+  private async updateExecution(execution: Partial<Execution>) {
+    try {
+      return await this.platform.client.updateExecution(execution);
+    } catch (e) {
+      this.platform.log.debug('Failed to update execution', e);
+    }
+  }
+
+  private updateSources(modeInputServices: Service[]) {
+    // Handles showing/hiding of sources
+    for (let i = 0; i < modeInputServices.length; i++) {
+      modeInputServices[i]
+        .getCharacteristic(this.Characteristic.TargetVisibilityState)
+        .onSet(this.setVisibility(modeInputServices[i]));
+    }
+  }
+
+  private async handleRemoteButton(value: CharacteristicValue) {
+    this.platform.log.debug('Remote key pressed: ' + value);
+
+    let mode: string;
+    switch (value) {
+      case this.Characteristic.RemoteKey.ARROW_UP:
+        this.platform.log.debug('Increase brightness by 25%');
+        await this.updateExecution({
+          brightness: Math.min(200, this.state.execution.brightness + 50),
+        });
+        break;
+
+      case this.Characteristic.RemoteKey.ARROW_DOWN:
+        this.platform.log.debug('Decrease brightness by 25%');
+        await this.updateExecution({
+          brightness: Math.max(0, this.state.execution.brightness - 50),
+        });
+        break;
+
+      case this.Characteristic.RemoteKey.ARROW_LEFT: {
+        // Gets the current mode or the last sync mode to set the intensity
+        mode = this.getMode();
+
+        this.platform.log.debug('Toggle intensity');
+        const currentIntensity = this.state.execution[mode].intensity;
+        const nextLowestIntensity =
+          this.intensityToNumber[currentIntensity] - 1;
+        if (nextLowestIntensity < 1) {
+          break;
+        }
+        const nextIntensity = this.numberToIntensity[nextLowestIntensity];
+        const body = {};
+        body[mode] = {
+          intensity: nextIntensity,
+        };
+        await this.updateExecution(body);
+        break;
+      }
+
+      case this.Characteristic.RemoteKey.ARROW_RIGHT: {
+        // Gets the current mode or the last sync mode to set the intensity
+        mode = this.getMode();
+
+        this.platform.log.debug('Toggle intensity');
+        const currentIntensity = this.state.execution[mode].intensity;
+        const nextHighestIntensity =
+          this.intensityToNumber[currentIntensity] + 1;
+        if (nextHighestIntensity > 4) {
+          break;
+        }
+        const nextIntensity = this.numberToIntensity[nextHighestIntensity];
+        const body = {};
+        body[mode] = {
+          intensity: nextIntensity,
+        };
+        await this.updateExecution(body);
+        break;
+      }
+
+      case this.Characteristic.RemoteKey.SELECT: {
+        this.platform.log.debug('Toggle mode');
+        const currentMode = this.state.execution.mode;
+        const nextMode = (this.modeToNumber[currentMode] % 4) + 1;
+        await this.updateExecution({
+          mode: this.numberToMode[nextMode],
+        });
+        break;
+      }
+
+      case this.Characteristic.RemoteKey.PLAY_PAUSE:
+        this.platform.log.debug('Toggle switch state');
+        if (
+          this.state.execution.mode !== this._powersave &&
+          this.state.execution.mode !== this._passthrough
+        ) {
+          await this.updateExecution({
+            mode: this.platform.config.defaultOffMode,
+          });
+        } else {
+          let onMode = this.platform.config.defaultOnMode;
+          if (onMode === 'lastSyncMode') {
             if (
-              modeTvAccessoryLightBulbService.getCharacteristic(
-                this.Characteristic.On
-              ).value === value
+              this.state &&
+              this.state.execution &&
+              this.state.execution.lastSyncMode
             ) {
-              if (value) {
-                this.platform.log.debug('Switch state is already ON');
-              } else {
-                this.platform.log.debug('Switch state is already OFF');
-              }
-              callback(null);
-              return;
-            }
-
-            // Saves the changes
-            if (value) {
-              this.platform.log.debug('Switch state to ON');
-              let onMode = this.platform.config.defaultOnMode;
-              if (onMode === 'lastSyncMode') {
-                if (
-                  this.state &&
-                  this.state.execution &&
-                  this.state.execution.lastSyncMode
-                ) {
-                  onMode = this.state.execution.lastSyncMode;
-                } else {
-                  onMode = this._video;
-                }
-              }
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: onMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to ON');
-                  });
-              });
+              onMode = this.state.execution.lastSyncMode;
             } else {
-              this.platform.log.debug('Switch state to OFF');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: this.platform.config.defaultOffMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to OFF');
-                  });
-              });
+              onMode = this._video;
             }
+          }
 
-            // Performs the callback
-            callback(null);
+          await this.updateExecution({
+            mode: onMode,
           });
+        }
+        break;
 
-        // Subscribes for changes of the brightness characteristic
-        modeTvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.Brightness)
-          .on('set', (value, callback) => {
-            // Saves the changes
-            this.platform.log.debug('Switch brightness to ' + value);
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  brightness: Math.round(((value as number) / 100.0) * 200),
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-
-            // Performs the callback
-            callback(null);
-          });
+      case this.Characteristic.RemoteKey.INFORMATION: {
+        this.platform.log.debug('Toggle hdmi source');
+        const hdmiSource = this.state.execution.hdmiSource;
+        const currentSourcePosition = parseInt(hdmiSource.replace('input', ''));
+        const nextSourcePosition = (currentSourcePosition % 4) + 1;
+        await this.updateExecution({
+          hdmiSource: 'input' + nextSourcePosition,
+        });
+        break;
       }
     }
   }
 
-  private handleIntensityTv(intensityTvAccessory) {
+  private getMode() {
+    let mode = this._video;
+    if (
+      this.state.execution.mode !== this._powersave &&
+      this.state.execution.mode !== this._passthrough
+    ) {
+      mode = this.state.execution.mode;
+    } else if (this.state.execution.lastSyncMode) {
+      mode = this.state.execution.lastSyncMode;
+    }
+    return mode;
+  }
+
+  private handleIntensityTv(intensityTvAccessory: PlatformAccessory | null) {
     // Handles the intensity TV accessory if it is enabled
     if (intensityTvAccessory) {
       // Updates tv service
@@ -1441,11 +656,10 @@ export class SyncBoxDevice {
           );
           intensityTvService
             .getCharacteristic(this.Characteristic.ConfiguredName)
-            .on('set', (value, callback) => {
+            .onSet((value: CharacteristicValue) => {
               // @ts-expect-error already checked
               this.mainAccessory.context.intensityTvAccessoryConfiguredName =
                 value;
-              callback(null);
             });
         } else {
           intensityTvService.setCharacteristic(
@@ -1457,44 +671,13 @@ export class SyncBoxDevice {
 
       // Register intensity input sources
       const intensityInputServices: Service[] = [];
-      const intensities = ['none', 'Subtle', 'Moderate', 'High', 'Intense'];
-      for (let i = 1; i <= 4; i++) {
-        let intensityInputService = intensityTvAccessory.getServiceById(
-          this.Service.InputSource,
-          'INTENSITY ' + i
+      for (let i = 1; i < this.numberToIntensity.size; i++) {
+        const position = 'INTENSITY ' + i;
+        const intensityInputService = this.getInputService(
+          intensityTvAccessory,
+          this.numberToIntensity[i],
+          position
         );
-        if (!intensityInputService) {
-          intensityInputService = intensityTvAccessory.addService(
-            this.Service.InputSource,
-            'intensity' + i,
-            'INTENSITY ' + i
-          );
-
-          // Sets the TV name
-          intensityInputService
-            .setCharacteristic(
-              this.Characteristic.ConfiguredName,
-              intensities[i]
-            )
-            .setCharacteristic(
-              this.Characteristic.IsConfigured,
-              this.Characteristic.IsConfigured.CONFIGURED
-            )
-            .setCharacteristic(
-              this.Characteristic.CurrentVisibilityState,
-              this.Characteristic.CurrentVisibilityState.SHOWN
-            )
-            .setCharacteristic(
-              this.Characteristic.TargetVisibilityState,
-              this.Characteristic.TargetVisibilityState.SHOWN
-            );
-        }
-        intensityInputService
-          .setCharacteristic(this.Characteristic.Identifier, i)
-          .setCharacteristic(
-            this.Characteristic.InputSourceType,
-            this.Characteristic.InputSourceType.HDMI
-          );
 
         // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
         intensityTvService.addLinkedService(intensityInputService);
@@ -1510,417 +693,28 @@ export class SyncBoxDevice {
       // Handles on/off events
       intensityTvService
         .getCharacteristic(this.Characteristic.Active)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            intensityTvService.getCharacteristic(this.Characteristic.Active)
-              .value === value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
-        });
+        .onSet(this.setServiceActive(intensityTvService).bind(this));
 
       // Handles input source changes
       intensityTvService
         .getCharacteristic(this.Characteristic.ActiveIdentifier)
-        .on('set', (value, callback) => {
-          // Saves the changes
-          let intensity = '';
-          switch (value) {
-            case 1:
-              intensity = 'subtle';
-              break;
-            case 2:
-              intensity = 'moderate';
-              break;
-            case 3:
-              intensity = 'high';
-              break;
-            case 4:
-              intensity = 'intense';
-              break;
-          }
+        .onSet(async (value: CharacteristicValue) => {
+          const mode = this.getMode();
+          const intensity = this.numberToIntensity[value as number] || '';
           this.platform.log.debug('Switch intensity to ' + intensity);
-          this.platform.limiter.schedule(() => {
-            return this.platform.client
-              .updateExecution({
-                intensity: intensity,
-              })
-              .catch(() => {
-                this.platform.log.debug(
-                  'Failed to switch intensity to ' + intensity
-                );
-              });
-          });
-
-          // Performs the callback
-          callback(null);
+          const body = {};
+          body[mode] = {
+            intensity,
+          };
+          return await this.updateExecution(body);
         });
 
-      // Handles showing/hiding of sources
-      for (let i = 0; i < intensityInputServices.length; i++) {
-        intensityInputServices[i]
-          .getCharacteristic(this.Characteristic.TargetVisibilityState)
-          .on('set', (value, callback) => {
-            if (value === this.Characteristic.TargetVisibilityState.SHOWN) {
-              intensityInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.SHOWN
-              );
-            } else {
-              intensityInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.HIDDEN
-              );
-            }
-
-            // Performs the callback
-            callback(null);
-          });
-      }
+      this.updateSources(intensityInputServices);
 
       // Handles remote key input
       intensityTvService
         .getCharacteristic(this.Characteristic.RemoteKey)
-        .on('set', (value, callback) => {
-          this.platform.log.debug('Remote key pressed: ' + value);
-
-          let mode;
-          switch (value) {
-            case this.Characteristic.RemoteKey.ARROW_UP:
-              this.platform.log.debug('Increase brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.min(
-                      200,
-                      this.state.execution.brightness + 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to increase brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_DOWN:
-              this.platform.log.debug('Decrease brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.max(
-                      0,
-                      this.state.execution.brightness - 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to decrease brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_LEFT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'subtle',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_RIGHT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'intense',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.SELECT:
-              this.platform.log.debug('Toggle mode');
-              switch (this.state.execution.mode) {
-                case this._video:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._music })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._music:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._game })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._game:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        mode: this._passthrough,
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._passthrough:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._video })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              this.platform.log.debug('Toggle switch state');
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: this.platform.config.defaultOffMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              } else {
-                let onMode = this.platform.config.defaultOnMode;
-                if (onMode === 'lastSyncMode') {
-                  if (
-                    this.state &&
-                    this.state.execution &&
-                    this.state.execution.lastSyncMode
-                  ) {
-                    onMode = this.state.execution.lastSyncMode;
-                  } else {
-                    onMode = this._video;
-                  }
-                }
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: onMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.INFORMATION:
-              this.platform.log.debug('Toggle hdmi source');
-              switch (this.state.execution.hdmiSource) {
-                case 'input1':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input2',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input2':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input3',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input3':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input4',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input4':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input1',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-              }
-              break;
-          }
-
-          // Performs the callback
-          callback(null);
-        });
+        .onSet(this.handleRemoteButton.bind(this));
 
       // Stores the tv service
       this.intensityTvService = intensityTvService;
@@ -1929,6 +723,7 @@ export class SyncBoxDevice {
       if (this.platform.config.intensityTvAccessoryLightbulb) {
         // Updates the light bulb service
         let intensityTvAccessoryLightBulbService =
+          // @ts-expect-error // already checked
           intensityTvAccessory.getServiceById(this.Service.Lightbulb);
         if (!intensityTvAccessoryLightBulbService) {
           intensityTvAccessoryLightBulbService =
@@ -1942,89 +737,68 @@ export class SyncBoxDevice {
         // Subscribes for changes of the on characteristic
         intensityTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.On)
-          .on('set', (value, callback) => {
-            // Ignores changes if the new value equals the old value
-            if (
-              intensityTvAccessoryLightBulbService.getCharacteristic(
-                this.Characteristic.On
-              ).value === value
-            ) {
-              if (value) {
-                this.platform.log.debug('Switch state is already ON');
-              } else {
-                this.platform.log.debug('Switch state is already OFF');
-              }
-              callback(null);
-              return;
-            }
-
-            // Saves the changes
-            if (value) {
-              this.platform.log.debug('Switch state to ON');
-              let onMode = this.platform.config.defaultOnMode;
-              if (onMode === 'lastSyncMode') {
-                if (
-                  this.state &&
-                  this.state.execution &&
-                  this.state.execution.lastSyncMode
-                ) {
-                  onMode = this.state.execution.lastSyncMode;
-                } else {
-                  onMode = this._video;
-                }
-              }
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: onMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to ON');
-                  });
-              });
-            } else {
-              this.platform.log.debug('Switch state to OFF');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: this.platform.config.defaultOffMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to OFF');
-                  });
-              });
-            }
-
-            // Performs the callback
-            callback(null);
-          });
+          .onSet(
+            this.setServiceActive(intensityTvAccessoryLightBulbService).bind(
+              this
+            )
+          );
 
         // Subscribes for changes of the brightness characteristic
         intensityTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.Brightness)
-          .on('set', (value, callback) => {
-            // Saves the changes
-            this.platform.log.debug('Switch brightness to ' + value);
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  brightness: Math.round(((value as number) / 100.0) * 200),
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-
-            // Performs the callback
-            callback(null);
-          });
+          .onSet(this.setBrightness.bind(this));
       }
     }
   }
 
-  private handleEntertainmentTv(entertainmentTvAccessory) {
+  private getInputService(
+    tvAccessory: PlatformAccessory,
+    name: string,
+    position: string
+  ): Service {
+    let inputService = tvAccessory.getServiceById(
+      this.Service.InputSource,
+      position
+    );
+    if (!inputService) {
+      inputService = tvAccessory.addService(
+        this.Service.InputSource,
+        position.toLowerCase().replace(' ', ''),
+        position
+      );
+
+      // Sets the TV name
+      inputService
+        .setCharacteristic(this.Characteristic.ConfiguredName, name)
+        .setCharacteristic(
+          this.Characteristic.IsConfigured,
+          this.Characteristic.IsConfigured.CONFIGURED
+        )
+        .setCharacteristic(
+          this.Characteristic.CurrentVisibilityState,
+          this.Characteristic.CurrentVisibilityState.SHOWN
+        )
+        .setCharacteristic(
+          this.Characteristic.TargetVisibilityState,
+          this.Characteristic.TargetVisibilityState.SHOWN
+        );
+    }
+    inputService
+      .setCharacteristic(
+        this.Characteristic.Identifier,
+        position[position.length - 1]
+      )
+      .setCharacteristic(
+        this.Characteristic.InputSourceType,
+        this.Characteristic.InputSourceType.HDMI
+      );
+
+    return inputService;
+  }
+
+  private handleEntertainmentTv(
+    entertainmentTvAccessory: PlatformAccessory | null
+  ) {
     if (entertainmentTvAccessory) {
       // Updates tv service
       let entertainmentTvService = entertainmentTvAccessory.getServiceById(
@@ -2047,11 +821,10 @@ export class SyncBoxDevice {
           );
           entertainmentTvService
             .getCharacteristic(this.Characteristic.ConfiguredName)
-            .on('set', (value, callback) => {
+            .onSet((value: CharacteristicValue) => {
               // @ts-expect-error already checked
               this.mainAccessory.context.entertainmentTvAccessoryConfiguredName =
                 value;
-              callback(null);
             });
         } else {
           entertainmentTvService.setCharacteristic(
@@ -2064,42 +837,17 @@ export class SyncBoxDevice {
       // Register input sources
       const entertainmentInputServices: Service[] = [];
       let i = 1;
+
       for (const groupId in this.state.hue.groups) {
         const group = this.state.hue.groups[groupId];
+        const name = group.name;
+        const position = 'AREA ' + i;
 
-        let entertainmentInputService = entertainmentTvAccessory.getServiceById(
-          this.Service.InputSource,
-          'AREA ' + i
+        const entertainmentInputService = this.getInputService(
+          entertainmentTvAccessory,
+          name,
+          position
         );
-        if (!entertainmentInputService) {
-          entertainmentInputService = entertainmentTvAccessory.addService(
-            this.Service.InputSource,
-            'area' + i,
-            'AREA ' + i
-          );
-
-          // Sets the TV name
-          entertainmentInputService
-            .setCharacteristic(this.Characteristic.ConfiguredName, group.name)
-            .setCharacteristic(
-              this.Characteristic.IsConfigured,
-              this.Characteristic.IsConfigured.CONFIGURED
-            )
-            .setCharacteristic(
-              this.Characteristic.CurrentVisibilityState,
-              this.Characteristic.CurrentVisibilityState.SHOWN
-            )
-            .setCharacteristic(
-              this.Characteristic.TargetVisibilityState,
-              this.Characteristic.TargetVisibilityState.SHOWN
-            );
-        }
-        entertainmentInputService
-          .setCharacteristic(this.Characteristic.Identifier, i)
-          .setCharacteristic(
-            this.Characteristic.InputSourceType,
-            this.Characteristic.InputSourceType.HDMI
-          );
 
         // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
         entertainmentTvService.addLinkedService(entertainmentInputService);
@@ -2117,68 +865,12 @@ export class SyncBoxDevice {
       // Handles on/off events
       entertainmentTvService
         .getCharacteristic(this.Characteristic.Active)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            entertainmentTvService.getCharacteristic(this.Characteristic.Active)
-              .value === value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
-        });
+        .onSet(this.setServiceActive(entertainmentTvService).bind(this));
 
       // Handles input source changes
       entertainmentTvService
         .getCharacteristic(this.Characteristic.ActiveIdentifier)
-        .on('set', (value, callback) => {
+        .onSet(async value => {
           // Gets the ID of the group based on the index
           let groupId: string | null = null;
           let i = 1;
@@ -2192,341 +884,29 @@ export class SyncBoxDevice {
 
           // @ts-expect-error need to use self as a key
           const group = this.state.hue.groups[groupId];
-
+          if (!group || !groupId) {
+            return;
+          }
           // Saves the changes
           this.platform.log.debug('Switch entertainment area to ' + group.name);
-          this.platform.limiter.schedule(() => {
-            return this.platform.client
-              .updateHue({
-                groupId: groupId,
-              })
-              .catch(() => {
-                this.platform.log.debug(
-                  'Failed to switch entertainment area to ' + group.name
-                );
-              });
-          });
-
-          // Performs the callback
-          callback(null);
+          try {
+            await this.platform.client.updateHue({
+              groupId: groupId,
+            });
+          } catch (e) {
+            this.platform.log.debug(
+              'Failed to switch entertainment area to ' + group.name,
+              e
+            );
+          }
         });
 
-      // Handles showing/hiding of sources
-      for (let i = 0; i < entertainmentInputServices.length; i++) {
-        entertainmentInputServices[i]
-          .getCharacteristic(this.Characteristic.TargetVisibilityState)
-          .on('set', (value, callback) => {
-            if (value === this.Characteristic.TargetVisibilityState.SHOWN) {
-              entertainmentInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.SHOWN
-              );
-            } else {
-              entertainmentInputServices[i].setCharacteristic(
-                this.Characteristic.CurrentVisibilityState,
-                this.Characteristic.CurrentVisibilityState.HIDDEN
-              );
-            }
-
-            // Performs the callback
-            callback(null);
-          });
-      }
+      this.updateSources(entertainmentInputServices);
 
       // Handles remote key input
       entertainmentTvService
         .getCharacteristic(this.Characteristic.RemoteKey)
-        .on('set', (value, callback) => {
-          this.platform.log.debug('Remote key pressed: ' + value);
-
-          let mode;
-          switch (value) {
-            case this.Characteristic.RemoteKey.ARROW_UP:
-              this.platform.log.debug('Increase brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.min(
-                      200,
-                      this.state.execution.brightness + 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to increase brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_DOWN:
-              this.platform.log.debug('Decrease brightness by 25%');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    brightness: Math.max(
-                      0,
-                      this.state.execution.brightness - 50
-                    ),
-                  })
-                  .catch(() => {
-                    this.platform.log.debug(
-                      'Failed to decrease brightness by 25%'
-                    );
-                  });
-              });
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_LEFT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'subtle',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.ARROW_RIGHT:
-              // Gets the current mode or the last sync mode to set the intensity
-              mode = this._video;
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                mode = this.state.execution.mode;
-              } else if (this.state.execution.lastSyncMode) {
-                mode = this.state.execution.lastSyncMode;
-              }
-
-              this.platform.log.debug('Toggle intensity');
-              switch (this.state.execution[mode].intensity) {
-                case 'subtle':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'moderate',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'moderate':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'high',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'high':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        intensity: 'intense',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle intensity');
-                      });
-                  });
-                  break;
-                case 'intense':
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.SELECT:
-              this.platform.log.debug('Toggle mode');
-              switch (this.state.execution.mode) {
-                case this._video:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._music })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._music:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._game })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._game:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        mode: this._passthrough,
-                      })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-                case this._passthrough:
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({ mode: this._video })
-                      .catch(() => {
-                        this.platform.log.debug('Failed to toggle mode');
-                      });
-                  });
-                  break;
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              this.platform.log.debug('Toggle switch state');
-              if (
-                this.state.execution.mode !== this._powersave &&
-                this.state.execution.mode !== this._passthrough
-              ) {
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: this.platform.config.defaultOffMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              } else {
-                let onMode = this.platform.config.defaultOnMode;
-                if (onMode === 'lastSyncMode') {
-                  if (
-                    this.state &&
-                    this.state.execution &&
-                    this.state.execution.lastSyncMode
-                  ) {
-                    onMode = this.state.execution.lastSyncMode;
-                  } else {
-                    onMode = this._video;
-                  }
-                }
-                this.platform.limiter
-                  .schedule(() => {
-                    return this.platform.client.updateExecution({
-                      mode: onMode,
-                    });
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to toggle switch state');
-                  });
-              }
-              break;
-
-            case this.Characteristic.RemoteKey.INFORMATION:
-              this.platform.log.debug('Toggle hdmi source');
-              switch (this.state.execution.hdmiSource) {
-                case 'input1':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input2',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input2':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input3',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input3':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input4',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-                case 'input4':
-                  this.platform.limiter.schedule(() => {
-                    return this.platform.client
-                      .updateExecution({
-                        hdmiSource: 'input1',
-                      })
-                      .catch(() => {
-                        this.platform.log.debug(
-                          'Failed to toggle switch hdmi source'
-                        );
-                      });
-                  });
-                  break;
-              }
-              break;
-          }
-
-          // Performs the callback
-          callback(null);
-        });
+        .onSet(this.handleRemoteButton.bind(this));
 
       // Stores the tv service
       this.entertainmentTvService = entertainmentTvService;
@@ -2535,6 +915,7 @@ export class SyncBoxDevice {
       if (this.platform.config.entertainmentTvAccessoryLightbulb) {
         // Updates the light bulb service
         let entertainmentTvAccessoryLightBulbService =
+          // @ts-expect-error // already checked
           entertainmentTvAccessory.getServiceById(this.Service.Lightbulb);
         if (!entertainmentTvAccessoryLightBulbService) {
           entertainmentTvAccessoryLightBulbService =
@@ -2548,84 +929,16 @@ export class SyncBoxDevice {
         // Subscribes for changes of the on characteristic
         entertainmentTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.On)
-          .on('set', (value, callback) => {
-            // Ignores changes if the new value equals the old value
-            if (
-              entertainmentTvAccessoryLightBulbService.getCharacteristic(
-                this.Characteristic.On
-              ).value === value
-            ) {
-              if (value) {
-                this.platform.log.debug('Switch state is already ON');
-              } else {
-                this.platform.log.debug('Switch state is already OFF');
-              }
-              callback(null);
-              return;
-            }
-
-            // Saves the changes
-            if (value) {
-              this.platform.log.debug('Switch state to ON');
-              let onMode = this.platform.config.defaultOnMode;
-              if (onMode === 'lastSyncMode') {
-                if (
-                  this.state &&
-                  this.state.execution &&
-                  this.state.execution.lastSyncMode
-                ) {
-                  onMode = this.state.execution.lastSyncMode;
-                } else {
-                  onMode = this._video;
-                }
-              }
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: onMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to ON');
-                  });
-              });
-            } else {
-              this.platform.log.debug('Switch state to OFF');
-              this.platform.limiter.schedule(() => {
-                return this.platform.client
-                  .updateExecution({
-                    mode: this.platform.config.defaultOffMode,
-                  })
-                  .catch(() => {
-                    this.platform.log.debug('Failed to switch state to OFF');
-                  });
-              });
-            }
-
-            // Performs the callback
-            callback(null);
-          });
+          .onSet(
+            this.setServiceActive(
+              entertainmentTvAccessoryLightBulbService
+            ).bind(this)
+          );
 
         // Subscribes for changes of the brightness characteristic
         entertainmentTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.Brightness)
-          .on('set', (value, callback) => {
-            // Saves the changes
-            this.platform.log.debug('Switch brightness to ' + value);
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  brightness: Math.round(((value as number) / 100.0) * 200),
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-
-            // Performs the callback
-            callback(null);
-          });
+          .onSet(this.setBrightness.bind(this));
       }
     }
   }
@@ -2634,324 +947,99 @@ export class SyncBoxDevice {
     switchAccessory: PlatformAccessory<UnknownContext> | null
   ) {
     // Handles the switch accessory if it is enabled
-    if (switchAccessory) {
-      // Updates the switch service
-      let switchService = switchAccessory.getServiceById(
-        this.Service.Switch,
-        this._switch
-      );
-      if (!switchService) {
-        switchService = switchAccessory.addService(
-          this.Service.Switch,
-          this._switch,
-          this._switch
-        );
-      }
-
-      // Stores the switch service
-      this.switchService = switchService;
-
-      // Subscribes for changes of the on characteristic
-      switchService
-        .getCharacteristic(this.Characteristic.On)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            switchService.getCharacteristic(this.Characteristic.On).value ===
-            value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug(
-                    'Failed to switch brightness to ' + value
-                  );
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
-        });
+    if (!switchAccessory) {
+      return;
     }
+    // @ts-expect-error  already checked
+    let switchService = switchAccessory.getServiceById(this.Service.Switch);
+    if (!switchService) {
+      switchService = switchAccessory.addService(this.Service.Switch);
+    }
+    this.switchService = switchService;
+    switchService
+      .getCharacteristic(this.Characteristic.On)
+      .onSet(this.setServiceActive(switchService).bind(this));
   }
 
   private handleLightBulb(
     lightBulbAccessory: PlatformAccessory<UnknownContext> | null
   ) {
-    if (lightBulbAccessory) {
-      // Updates the light bulb service
-      let lightBulbService = lightBulbAccessory.getServiceById(
-        this.Service.Lightbulb,
-        this._lightbulb
-      );
-      if (!lightBulbService) {
-        lightBulbService = lightBulbAccessory.addService(
-          this.Service.Lightbulb,
-          this._lightbulb,
-          this._lightbulb
-        );
-      }
-
-      // Stores the light bulb service
-      this.lightBulbService = lightBulbService;
-
-      // Subscribes for changes of the on characteristic
-      lightBulbService
-        .getCharacteristic(this.Characteristic.On)
-        .on('set', (value, callback) => {
-          // Ignores changes if the new value equals the old value
-          if (
-            lightBulbService.getCharacteristic(this.Characteristic.On).value ===
-            value
-          ) {
-            if (value) {
-              this.platform.log.debug('Switch state is already ON');
-            } else {
-              this.platform.log.debug('Switch state is already OFF');
-            }
-            callback(null);
-            return;
-          }
-
-          // Saves the changes
-          if (value) {
-            this.platform.log.debug('Switch state to ON');
-            let onMode = this.platform.config.defaultOnMode;
-            if (onMode === 'lastSyncMode') {
-              if (
-                this.state &&
-                this.state.execution &&
-                this.state.execution.lastSyncMode
-              ) {
-                onMode = this.state.execution.lastSyncMode;
-              } else {
-                onMode = this._video;
-              }
-            }
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: onMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to ON');
-                });
-            });
-          } else {
-            this.platform.log.debug('Switch state to OFF');
-            this.platform.limiter.schedule(() => {
-              return this.platform.client
-                .updateExecution({
-                  mode: this.platform.config.defaultOffMode,
-                })
-                .catch(() => {
-                  this.platform.log.debug('Failed to switch state to OFF');
-                });
-            });
-          }
-
-          // Performs the callback
-          callback(null);
-        });
-
-      // Subscribes for changes of the brightness characteristic
-      lightBulbService
-        .getCharacteristic(this.Characteristic.Brightness)
-        .on('set', (value, callback) => {
-          // Saves the changes
-          this.platform.log.debug('Switch brightness to ' + value);
-          this.platform.limiter.schedule(() => {
-            return this.platform.client
-              .updateExecution({
-                brightness: Math.round(((value as number) / 100.0) * 200),
-              })
-              .catch(() => {
-                this.platform.log.debug(
-                  'Failed to switch brightness to ' + value
-                );
-              });
-          });
-
-          // Performs the callback
-          callback(null);
-        });
+    if (!lightBulbAccessory) {
+      return;
     }
+    // @ts-expect-error  already checked
+    let lightBulbService = lightBulbAccessory.getServiceById(
+      this.Service.Lightbulb
+    );
+    if (!lightBulbService) {
+      lightBulbService = lightBulbAccessory.addService(this.Service.Lightbulb);
+    }
+    this.lightBulbService = lightBulbService;
+    lightBulbService
+      .getCharacteristic(this.Characteristic.On)
+      .onSet(this.setServiceActive(lightBulbService).bind(this));
+    lightBulbService
+      .getCharacteristic(this.Characteristic.Brightness)
+      .onSet(this.setBrightness.bind(this));
   }
 
   private getEntertainmentTvAccssory() {
-    let entertainmentTvAccessory;
-    if (this.platform.config.entertainmentTvAccessory) {
-      this.platform.log.debug(
-        'Adding new accessory with kind EntertainmentTVAccessory.'
-      );
-      entertainmentTvAccessory = new this.Accessory(
-        this.state.device.name,
-        this.UUIDGen.generate('EntertainmentTVAccessory')
-      );
-      switch (this.platform.config.entertainmentTvAccessoryType) {
-        case 'settopbox':
-          entertainmentTvAccessory.category =
-            this.platform.api.hap.Categories.TV_SET_TOP_BOX;
-          break;
-        case 'tvstick':
-          entertainmentTvAccessory.category =
-            this.platform.api.hap.Categories.TV_STREAMING_STICK;
-          break;
-        case 'audioreceiver':
-          entertainmentTvAccessory.category =
-            this.platform.api.hap.Categories.AUDIO_RECEIVER;
-          break;
-        default:
-          entertainmentTvAccessory.category =
-            this.platform.api.hap.Categories.TELEVISION;
-          break;
-      }
-      entertainmentTvAccessory.context.kind = 'EntertainmentTVAccessory';
-      this.externalAccessories.push(entertainmentTvAccessory);
-      this.deviceAccessories.push(entertainmentTvAccessory);
+    if (!this.platform.config.entertainmentTvAccessory) {
+      return null;
     }
-    return entertainmentTvAccessory;
+    return this.getBaseTvAccessory(
+      'EntertainmentTVAccessory',
+      this.platform.config.entertainmentTvAccessoryType
+    );
   }
 
   private getIntensityTvAccessory() {
-    let intensityTvAccessory;
-    if (this.platform.config.intensityTvAccessory) {
-      this.platform.log.debug(
-        'Adding new accessory with kind IntensityTVAccessory.'
-      );
-      intensityTvAccessory = new this.Accessory(
-        this.state.device.name,
-        this.UUIDGen.generate('IntensityTVAccessory')
-      );
-      switch (this.platform.config.intensityTvAccessoryType) {
-        case 'settopbox':
-          intensityTvAccessory.category =
-            this.platform.api.hap.Categories.TV_SET_TOP_BOX;
-          break;
-        case 'tvstick':
-          intensityTvAccessory.category =
-            this.platform.api.hap.Categories.TV_STREAMING_STICK;
-          break;
-        case 'audioreceiver':
-          intensityTvAccessory.category =
-            this.platform.api.hap.Categories.AUDIO_RECEIVER;
-          break;
-        default:
-          intensityTvAccessory.category =
-            this.platform.api.hap.Categories.TELEVISION;
-          break;
-      }
-      intensityTvAccessory.context.kind = 'IntensityTVAccessory';
-      this.externalAccessories.push(intensityTvAccessory);
-      this.deviceAccessories.push(intensityTvAccessory);
+    if (!this.platform.config.intensityTvAccessory) {
+      return null;
     }
-    return intensityTvAccessory;
+    return this.getBaseTvAccessory(
+      'IntensityTVAccessory',
+      this.platform.config.intensityTvAccessoryType
+    );
   }
 
   private getModeTvAccessory() {
-    let modeTvAccessory;
-    if (this.platform.config.modeTvAccessory) {
-      this.platform.log.debug(
-        'Setting up accessory with kind ModeTVAccessory.'
-      );
-      modeTvAccessory = new this.Accessory(
-        this.state.device.name,
-        this.UUIDGen.generate('ModeTVAccessory')
-      );
-      switch (this.platform.config.modeTvAccessoryType) {
-        case 'settopbox':
-          modeTvAccessory.category =
-            this.platform.api.hap.Categories.TV_SET_TOP_BOX;
-          break;
-        case 'tvstick':
-          modeTvAccessory.category =
-            this.platform.api.hap.Categories.TV_STREAMING_STICK;
-          break;
-        case 'audioreceiver':
-          modeTvAccessory.category =
-            this.platform.api.hap.Categories.AUDIO_RECEIVER;
-          break;
-        default:
-          modeTvAccessory.category =
-            this.platform.api.hap.Categories.TELEVISION;
-          break;
-      }
-      modeTvAccessory.context.kind = 'ModeTVAccessory';
-      this.externalAccessories.push(modeTvAccessory);
-      this.deviceAccessories.push(modeTvAccessory);
+    if (!this.platform.config.modeTvAccessory) {
+      return null;
     }
-    return modeTvAccessory;
+    return this.getBaseTvAccessory(
+      'ModeTVAccessory',
+      this.platform.config.modeTvAccessoryType
+    );
   }
 
-  private getTcAccessory() {
-    let tvAccessory;
-    if (this.platform.config.tvAccessory) {
-      this.platform.log.debug('Setting up accessory with kind TVAccessory.');
-      tvAccessory = new this.Accessory(
-        this.state.device.name,
-        this.UUIDGen.generate('TVAccessory')
-      );
-      switch (this.platform.config.tvAccessoryType) {
-        case 'settopbox':
-          tvAccessory.category =
-            this.platform.api.hap.Categories.TV_SET_TOP_BOX;
-          break;
-        case 'tvstick':
-          tvAccessory.category =
-            this.platform.api.hap.Categories.TV_STREAMING_STICK;
-          break;
-        case 'audioreceiver':
-          tvAccessory.category =
-            this.platform.api.hap.Categories.AUDIO_RECEIVER;
-          break;
-        default:
-          tvAccessory.category = this.platform.api.hap.Categories.TELEVISION;
-          break;
-      }
-      tvAccessory.context.kind = 'TVAccessory';
-      this.externalAccessories.push(tvAccessory);
-      this.deviceAccessories.push(tvAccessory);
+  private getBaseTvAccessory(accessoryName: string, accessoryType: string) {
+    this.platform.log.debug(
+      'Setting up accessory ' +
+        accessoryName +
+        ' with kind ' +
+        accessoryType +
+        '.'
+    );
+    const accessory = new this.Accessory(
+      this.state.device.name,
+      this.UUIDGen.generate(accessoryName)
+    );
+    accessory.category = this.tvAccessoryTypesToCategory[accessoryType];
+    accessory.context.kind = accessoryType;
+    this.externalAccessories.push(accessory);
+    this.deviceAccessories.push(accessory);
+    return accessory;
+  }
+
+  private getTvAccessory() {
+    if (!this.platform.config.tvAccessory) {
+      return null;
     }
-    return tvAccessory;
+    return this.getBaseTvAccessory(
+      'TVAccessory',
+      this.platform.config.tvAccessoryType
+    );
   }
 
   public update(state: State): void {
@@ -3042,32 +1130,10 @@ export class SyncBoxDevice {
 
       // Updates the mode input characteristic
       this.platform.log.debug('Updated mode to ' + this.state.execution.mode);
-      switch (state.execution.mode) {
-        case this._video:
-          this.modeTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            1
-          );
-          break;
-        case this._music:
-          this.modeTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            2
-          );
-          break;
-        case this._game:
-          this.modeTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            3
-          );
-          break;
-        case this._passthrough:
-          this.modeTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            4
-          );
-          break;
-      }
+      this.modeTvService.updateCharacteristic(
+        this.Characteristic.ActiveIdentifier,
+        this.modeToNumber[state.execution.mode]
+      );
 
       // Updates the corresponding service
       if (this.modeTvAccessoryLightBulbService) {
@@ -3102,45 +1168,19 @@ export class SyncBoxDevice {
       );
 
       // Gets the current mode or the last sync mode to set the intensity
-      let mode = this._video;
-      if (
-        this.state.execution.mode !== this._powersave &&
-        this.state.execution.mode !== this._passthrough
-      ) {
-        mode = this.state.execution.mode;
-      } else if (state.execution.lastSyncMode) {
-        mode = this.state.execution.lastSyncMode;
-      }
+      const mode = this.getMode();
 
       // Updates the intensity input characteristic
       this.platform.log.debug(
         'Updated intensity to ' + this.state.execution[mode].intensity
       );
-      switch (state.execution[mode].intensity) {
-        case 'subtle':
-          this.intensityTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            1
-          );
-          break;
-        case 'moderate':
-          this.intensityTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            2
-          );
-          break;
-        case 'high':
-          this.intensityTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            3
-          );
-          break;
-        case 'intense':
-          this.intensityTvService.updateCharacteristic(
-            this.Characteristic.ActiveIdentifier,
-            4
-          );
-          break;
+      const brightness =
+        this.intensityToNumber[state.execution[mode].intensity];
+      if (brightness) {
+        this.intensityTvService.updateCharacteristic(
+          this.Characteristic.ActiveIdentifier,
+          brightness
+        );
       }
 
       // Updates the corresponding service
@@ -3181,7 +1221,6 @@ export class SyncBoxDevice {
         if (currentGroupId === this.state.hue.groupId) {
           break;
         }
-
         index++;
       }
 

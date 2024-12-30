@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { HueSyncBoxPlatform } from '../platform';
-import { State } from '../state';
+import { Execution, Hue, State } from '../state';
 import * as https from 'node:https';
 
 export class SyncBoxClient {
@@ -10,18 +10,18 @@ export class SyncBoxClient {
     return this.sendRequest<State>('GET', '');
   }
 
-  public updateExecution(execution: object): Promise<void> {
+  public updateExecution(execution: Partial<Execution>): Promise<void> {
     return this.sendRequest<void>('PUT', 'execution', execution);
   }
 
-  public updateHue(hue: object): Promise<void> {
+  public updateHue(hue: Partial<Hue>): Promise<void> {
     return this.sendRequest<void>('PUT', 'hue', hue);
   }
 
   private async sendRequest<T>(
     method: string,
     path: string,
-    body?: object
+    body?: Partial<Execution> | Partial<Hue> | null
   ): Promise<T> {
     const url = `https://${this.platform.config.syncBoxIpAddress}/api/v1/${path}`;
     const options = {
