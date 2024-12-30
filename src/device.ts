@@ -1,5 +1,5 @@
 import { HueSyncBoxPlatform } from './platform';
-import { HdmiInput, State } from './lib/state';
+import { HdmiInput, State } from './state';
 import type { PlatformAccessory, Service } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
@@ -50,7 +50,7 @@ export class SyncBoxDevice {
           1
         );
       } else {
-        platform.log.info('Adding new accessory with kind LightBulbAccessory.');
+        this.platform.log.info('Adding new accessory with kind LightBulbAccessory.');
         lightBulbAccessory = new this.Accessory(
           state.device.name,
           this.UUIDGen.generate('LightBulbAccessory')
@@ -75,7 +75,7 @@ export class SyncBoxDevice {
           1
         );
       } else {
-        platform.log.debug('Adding new accessory with kind SwitchAccessory.');
+        this.platform.log.debug('Adding new accessory with kind SwitchAccessory.');
         switchAccessory = new this.Accessory(
           state.device.name,
           this.UUIDGen.generate('SwitchAccessory')
@@ -91,7 +91,7 @@ export class SyncBoxDevice {
     // Gets the tv accessory
     let tvAccessory;
     if (platform.config.tvAccessory) {
-      platform.log.debug('Setting up accessory with kind TVAccessory.');
+      this.platform.log.debug('Setting up accessory with kind TVAccessory.');
       tvAccessory = new this.Accessory(
         state.device.name,
         this.UUIDGen.generate('TVAccessory')
@@ -121,7 +121,7 @@ export class SyncBoxDevice {
     // Gets the tv accessory
     let modeTvAccessory;
     if (platform.config.modeTvAccessory) {
-      platform.log.debug('Setting up accessory with kind ModeTVAccessory.');
+      this.platform.log.debug('Setting up accessory with kind ModeTVAccessory.');
       modeTvAccessory = new this.Accessory(
         state.device.name,
         this.UUIDGen.generate('ModeTVAccessory')
@@ -152,7 +152,7 @@ export class SyncBoxDevice {
     // Gets the tv accessory
     let intensityTvAccessory;
     if (platform.config.intensityTvAccessory) {
-      platform.log.debug(
+      this.platform.log.debug(
         'Adding new accessory with kind IntensityTVAccessory.'
       );
       intensityTvAccessory = new this.Accessory(
@@ -185,7 +185,7 @@ export class SyncBoxDevice {
     // Gets the tv accessory
     let entertainmentTvAccessory;
     if (platform.config.entertainmentTvAccessory) {
-      platform.log.debug(
+      this.platform.log.debug(
         'Adding new accessory with kind EntertainmentTVAccessory.'
       );
       entertainmentTvAccessory = new this.Accessory(
@@ -225,7 +225,7 @@ export class SyncBoxDevice {
     // Removes all unused accessories
     for (let i = 0; i < this.unusedDeviceAccessories.length; i++) {
       const unusedDeviceAccessory = this.unusedDeviceAccessories[i];
-      platform.log.debug(
+      this.platform.log.debug(
         'Removing unused accessory with kind ' +
           unusedDeviceAccessory.context.kind +
           '.'
@@ -289,7 +289,6 @@ export class SyncBoxDevice {
     // Handles the lightbulb accessory if it is enabled
     if (lightBulbAccessory) {
       // Updates the light bulb service
-      // @ts-expect-error no subtype
       let lightBulbService = lightBulbAccessory.getServiceById(
         this.Service.Lightbulb
       );
@@ -312,9 +311,9 @@ export class SyncBoxDevice {
             value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -322,7 +321,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -337,16 +336,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -356,7 +357,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -370,7 +371,7 @@ export class SyncBoxDevice {
         .getCharacteristic(this.Characteristic.Brightness)
         .on('set', (value, callback) => {
           // Saves the changes
-          platform.log.debug('Switch brightness to ' + value);
+          this.platform.log.debug('Switch brightness to ' + value);
           platform.limiter
             .schedule(() => {
               return platform.client.updateExecution({
@@ -380,7 +381,7 @@ export class SyncBoxDevice {
             .then(
               () => {},
               () => {
-                platform.log.debug('Failed to switch brightness to ' + value);
+                this.platform.log.debug('Failed to switch brightness to ' + value);
               }
             );
 
@@ -392,7 +393,6 @@ export class SyncBoxDevice {
     // Handles the switch accessory if it is enabled
     if (switchAccessory) {
       // Updates the switch service
-      // @ts-expect-error no subtype
       let switchService = switchAccessory.getServiceById(this.Service.Switch);
       if (!switchService) {
         switchService = switchAccessory.addService(this.Service.Switch);
@@ -411,9 +411,9 @@ export class SyncBoxDevice {
             value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -421,7 +421,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -436,16 +436,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -455,7 +457,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -468,7 +470,6 @@ export class SyncBoxDevice {
     // Handles the TV accessory if it is enabled
     if (tvAccessory) {
       // Updates tv service
-      // @ts-expect-error no subtype
       let tvService = tvAccessory.getServiceById(this.Service.Television);
       if (!tvService) {
         tvService = tvAccessory.addService(this.Service.Television);
@@ -510,7 +511,6 @@ export class SyncBoxDevice {
           );
 
           // Sets the TV name
-          // @ts-expect-error need to use dynamic property
           const hdmiState: HdmiInput = this.state.hdmi[`input${i}`];
           const hdmiName = hdmiState.name || 'HDMI ' + i;
 
@@ -557,9 +557,9 @@ export class SyncBoxDevice {
             value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -567,7 +567,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -582,16 +582,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -601,7 +603,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -615,7 +617,7 @@ export class SyncBoxDevice {
         .getCharacteristic(this.Characteristic.ActiveIdentifier)
         .on('set', (value, callback) => {
           // Saves the changes
-          platform.log.debug('Switch hdmi source to input' + value);
+          this.platform.log.debug('Switch hdmi source to input' + value);
           platform.limiter
             .schedule(() => {
               return platform.client.updateExecution({
@@ -625,7 +627,7 @@ export class SyncBoxDevice {
             .then(
               () => {},
               () => {
-                platform.log.debug(
+                this.platform.log.debug(
                   'Failed to switch hdmi source to input' + value
                 );
               }
@@ -661,12 +663,12 @@ export class SyncBoxDevice {
       tvService
         .getCharacteristic(this.Characteristic.RemoteKey)
         .on('set', (value, callback) => {
-          platform.log.debug('Remote key pressed: ' + value);
+          this.platform.log.debug('Remote key pressed: ' + value);
 
           let mode;
           switch (value) {
             case this.Characteristic.RemoteKey.ARROW_UP:
-              platform.log.debug('Increase brightness by 25%');
+              this.platform.log.debug('Increase brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -679,13 +681,13 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to increase brightness by 25%');
+                    this.platform.log.debug('Failed to increase brightness by 25%');
                   }
                 );
               break;
 
             case this.Characteristic.RemoteKey.ARROW_DOWN:
-              platform.log.debug('Decrease brightness by 25%');
+              this.platform.log.debug('Decrease brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -698,7 +700,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to decrease brightness by 25%');
+                    this.platform.log.debug('Failed to decrease brightness by 25%');
                   }
                 );
               break;
@@ -716,7 +718,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use dynamic property
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   break;
@@ -730,7 +731,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -744,7 +745,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -758,7 +759,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -778,7 +779,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use dynamic property
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   platform.limiter
@@ -790,7 +790,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -804,7 +804,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -818,7 +818,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -838,7 +838,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -850,7 +850,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -864,7 +864,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -876,7 +876,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -884,7 +884,7 @@ export class SyncBoxDevice {
               break;
 
             case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              platform.log.debug('Toggle switch state');
+              this.platform.log.debug('Toggle switch state');
               if (
                 this.state.execution.mode !== 'powersave' &&
                 this.state.execution.mode !== 'passthrough'
@@ -898,7 +898,7 @@ export class SyncBoxDevice {
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               } else {
@@ -916,12 +916,14 @@ export class SyncBoxDevice {
                 }
                 platform.limiter
                   .schedule(() => {
-                    return platform.client.updateExecution({ mode: onMode });
+                    return platform.client.updateExecution({
+                      mode: onMode,
+                    });
                   })
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               }
@@ -940,7 +942,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -954,7 +956,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -968,7 +970,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -982,7 +984,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -1000,7 +1002,7 @@ export class SyncBoxDevice {
       // Handles the lightbulb accessory if it is enabled
       if (platform.config.tvAccessoryLightbulb) {
         // Updates the light bulb service
-        // @ts-expect-error no subtype
+
         let tvAccessoryLightBulbService = tvAccessory.getServiceById(
           this.Service.Lightbulb
         );
@@ -1024,9 +1026,9 @@ export class SyncBoxDevice {
               ).value === value
             ) {
               if (value) {
-                platform.log.debug('Switch state is already ON');
+                this.platform.log.debug('Switch state is already ON');
               } else {
-                platform.log.debug('Switch state is already OFF');
+                this.platform.log.debug('Switch state is already OFF');
               }
               callback(null);
               return;
@@ -1034,7 +1036,7 @@ export class SyncBoxDevice {
 
             // Saves the changes
             if (value) {
-              platform.log.debug('Switch state to ON');
+              this.platform.log.debug('Switch state to ON');
               let onMode = platform.config.defaultOnMode;
               if (onMode === 'lastSyncMode') {
                 if (
@@ -1049,16 +1051,18 @@ export class SyncBoxDevice {
               }
               platform.limiter
                 .schedule(() => {
-                  return platform.client.updateExecution({ mode: onMode });
+                  return platform.client.updateExecution({
+                    mode: onMode,
+                  });
                 })
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to ON');
+                    this.platform.log.debug('Failed to switch state to ON');
                   }
                 );
             } else {
-              platform.log.debug('Switch state to OFF');
+              this.platform.log.debug('Switch state to OFF');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -1068,7 +1072,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to OFF');
+                    this.platform.log.debug('Failed to switch state to OFF');
                   }
                 );
             }
@@ -1082,7 +1086,7 @@ export class SyncBoxDevice {
           .getCharacteristic(this.Characteristic.Brightness)
           .on('set', (value, callback) => {
             // Saves the changes
-            platform.log.debug('Switch brightness to ' + value);
+            this.platform.log.debug('Switch brightness to ' + value);
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -1092,7 +1096,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch brightness to ' + value);
+                  this.platform.log.debug('Failed to switch brightness to ' + value);
                 }
               );
 
@@ -1197,9 +1201,9 @@ export class SyncBoxDevice {
               .value === value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -1207,7 +1211,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -1222,16 +1226,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -1241,7 +1247,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -1270,15 +1276,17 @@ export class SyncBoxDevice {
               mode = 'passthrough';
               break;
           }
-          platform.log.debug('Switch mode to ' + mode);
+          this.platform.log.debug('Switch mode to ' + mode);
           platform.limiter
             .schedule(() => {
-              return platform.client.updateExecution({ mode: mode });
+              return platform.client.updateExecution({
+                mode: mode,
+              });
             })
             .then(
               () => {},
               () => {
-                platform.log.debug('Failed to switch mode to ' + mode);
+                this.platform.log.debug('Failed to switch mode to ' + mode);
               }
             );
 
@@ -1312,12 +1320,12 @@ export class SyncBoxDevice {
       modeTvService
         .getCharacteristic(this.Characteristic.RemoteKey)
         .on('set', (value, callback) => {
-          platform.log.debug('Remote key pressed: ' + value);
+          this.platform.log.debug('Remote key pressed: ' + value);
 
           let mode;
           switch (value) {
             case this.Characteristic.RemoteKey.ARROW_UP:
-              platform.log.debug('Increase brightness by 25%');
+              this.platform.log.debug('Increase brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -1330,13 +1338,13 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to increase brightness by 25%');
+                    this.platform.log.debug('Failed to increase brightness by 25%');
                   }
                 );
               break;
 
             case this.Characteristic.RemoteKey.ARROW_DOWN:
-              platform.log.debug('Decrease brightness by 25%');
+              this.platform.log.debug('Decrease brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -1349,7 +1357,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to decrease brightness by 25%');
+                    this.platform.log.debug('Failed to decrease brightness by 25%');
                   }
                 );
               break;
@@ -1367,7 +1375,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use dynamic property
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   break;
@@ -1381,7 +1388,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1395,7 +1402,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1409,7 +1416,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1429,7 +1436,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use dynamic property
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   platform.limiter
@@ -1441,7 +1447,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1455,7 +1461,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1469,7 +1475,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -1489,7 +1495,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -1501,7 +1507,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -1515,7 +1521,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -1527,7 +1533,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -1535,7 +1541,7 @@ export class SyncBoxDevice {
               break;
 
             case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              platform.log.debug('Toggle switch state');
+              this.platform.log.debug('Toggle switch state');
               if (
                 this.state.execution.mode !== 'powersave' &&
                 this.state.execution.mode !== 'passthrough'
@@ -1549,7 +1555,7 @@ export class SyncBoxDevice {
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               } else {
@@ -1567,12 +1573,14 @@ export class SyncBoxDevice {
                 }
                 platform.limiter
                   .schedule(() => {
-                    return platform.client.updateExecution({ mode: onMode });
+                    return platform.client.updateExecution({
+                      mode: onMode,
+                    });
                   })
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               }
@@ -1591,7 +1599,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -1605,7 +1613,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -1619,7 +1627,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -1633,7 +1641,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -1651,7 +1659,7 @@ export class SyncBoxDevice {
       // Handles the lightbulb accessory if it is enabled
       if (platform.config.modeTvAccessoryLightbulb) {
         // Updates the light bulb service
-        // @ts-expect-error no subtype
+
         let modeTvAccessoryLightBulbService = modeTvAccessory.getServiceById(
           this.Service.Lightbulb
         );
@@ -1675,9 +1683,9 @@ export class SyncBoxDevice {
               ).value === value
             ) {
               if (value) {
-                platform.log.debug('Switch state is already ON');
+                this.platform.log.debug('Switch state is already ON');
               } else {
-                platform.log.debug('Switch state is already OFF');
+                this.platform.log.debug('Switch state is already OFF');
               }
               callback(null);
               return;
@@ -1685,7 +1693,7 @@ export class SyncBoxDevice {
 
             // Saves the changes
             if (value) {
-              platform.log.debug('Switch state to ON');
+              this.platform.log.debug('Switch state to ON');
               let onMode = platform.config.defaultOnMode;
               if (onMode === 'lastSyncMode') {
                 if (
@@ -1700,16 +1708,18 @@ export class SyncBoxDevice {
               }
               platform.limiter
                 .schedule(() => {
-                  return platform.client.updateExecution({ mode: onMode });
+                  return platform.client.updateExecution({
+                    mode: onMode,
+                  });
                 })
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to ON');
+                    this.platform.log.debug('Failed to switch state to ON');
                   }
                 );
             } else {
-              platform.log.debug('Switch state to OFF');
+              this.platform.log.debug('Switch state to OFF');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -1719,7 +1729,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to OFF');
+                    this.platform.log.debug('Failed to switch state to OFF');
                   }
                 );
             }
@@ -1733,7 +1743,7 @@ export class SyncBoxDevice {
           .getCharacteristic(this.Characteristic.Brightness)
           .on('set', (value, callback) => {
             // Saves the changes
-            platform.log.debug('Switch brightness to ' + value);
+            this.platform.log.debug('Switch brightness to ' + value);
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -1743,7 +1753,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch brightness to ' + value);
+                  this.platform.log.debug('Failed to switch brightness to ' + value);
                 }
               );
 
@@ -1852,9 +1862,9 @@ export class SyncBoxDevice {
               .value === value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -1862,7 +1872,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -1877,16 +1887,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -1896,7 +1908,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -1925,15 +1937,17 @@ export class SyncBoxDevice {
               intensity = 'intense';
               break;
           }
-          platform.log.debug('Switch intensity to ' + intensity);
+          this.platform.log.debug('Switch intensity to ' + intensity);
           platform.limiter
             .schedule(() => {
-              return platform.client.updateExecution({ intensity: intensity });
+              return platform.client.updateExecution({
+                intensity: intensity,
+              });
             })
             .then(
               () => {},
               () => {
-                platform.log.debug(
+                this.platform.log.debug(
                   'Failed to switch intensity to ' + intensity
                 );
               }
@@ -1969,12 +1983,12 @@ export class SyncBoxDevice {
       intensityTvService
         .getCharacteristic(this.Characteristic.RemoteKey)
         .on('set', (value, callback) => {
-          platform.log.debug('Remote key pressed: ' + value);
+          this.platform.log.debug('Remote key pressed: ' + value);
 
           let mode;
           switch (value) {
             case this.Characteristic.RemoteKey.ARROW_UP:
-              platform.log.debug('Increase brightness by 25%');
+              this.platform.log.debug('Increase brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -1987,13 +2001,13 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to increase brightness by 25%');
+                    this.platform.log.debug('Failed to increase brightness by 25%');
                   }
                 );
               break;
 
             case this.Characteristic.RemoteKey.ARROW_DOWN:
-              platform.log.debug('Decrease brightness by 25%');
+              this.platform.log.debug('Decrease brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -2006,7 +2020,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to decrease brightness by 25%');
+                    this.platform.log.debug('Failed to decrease brightness by 25%');
                   }
                 );
               break;
@@ -2024,7 +2038,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use dynamic property
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   break;
@@ -2038,7 +2051,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2052,7 +2065,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2066,7 +2079,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2086,7 +2099,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use mode as key
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   platform.limiter
@@ -2098,7 +2110,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2112,7 +2124,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2126,7 +2138,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2146,7 +2158,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2158,7 +2170,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2172,7 +2184,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2184,7 +2196,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2192,7 +2204,7 @@ export class SyncBoxDevice {
               break;
 
             case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              platform.log.debug('Toggle switch state');
+              this.platform.log.debug('Toggle switch state');
               if (
                 this.state.execution.mode !== 'powersave' &&
                 this.state.execution.mode !== 'passthrough'
@@ -2206,7 +2218,7 @@ export class SyncBoxDevice {
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               } else {
@@ -2224,12 +2236,14 @@ export class SyncBoxDevice {
                 }
                 platform.limiter
                   .schedule(() => {
-                    return platform.client.updateExecution({ mode: onMode });
+                    return platform.client.updateExecution({
+                      mode: onMode,
+                    });
                   })
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               }
@@ -2248,7 +2262,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2262,7 +2276,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2276,7 +2290,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2290,7 +2304,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2308,8 +2322,8 @@ export class SyncBoxDevice {
       // Handles the lightbulb accessory if it is enabled
       if (platform.config.intensityTvAccessoryLightbulb) {
         // Updates the light bulb service
-        // @ts-expect-error no subtype
         let intensityTvAccessoryLightBulbService =
+
           intensityTvAccessory.getServiceById(this.Service.Lightbulb);
         if (!intensityTvAccessoryLightBulbService) {
           intensityTvAccessoryLightBulbService =
@@ -2331,9 +2345,9 @@ export class SyncBoxDevice {
               ).value === value
             ) {
               if (value) {
-                platform.log.debug('Switch state is already ON');
+                this.platform.log.debug('Switch state is already ON');
               } else {
-                platform.log.debug('Switch state is already OFF');
+                this.platform.log.debug('Switch state is already OFF');
               }
               callback(null);
               return;
@@ -2341,7 +2355,7 @@ export class SyncBoxDevice {
 
             // Saves the changes
             if (value) {
-              platform.log.debug('Switch state to ON');
+              this.platform.log.debug('Switch state to ON');
               let onMode = platform.config.defaultOnMode;
               if (onMode === 'lastSyncMode') {
                 if (
@@ -2356,16 +2370,18 @@ export class SyncBoxDevice {
               }
               platform.limiter
                 .schedule(() => {
-                  return platform.client.updateExecution({ mode: onMode });
+                  return platform.client.updateExecution({
+                    mode: onMode,
+                  });
                 })
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to ON');
+                    this.platform.log.debug('Failed to switch state to ON');
                   }
                 );
             } else {
-              platform.log.debug('Switch state to OFF');
+              this.platform.log.debug('Switch state to OFF');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -2375,7 +2391,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to OFF');
+                    this.platform.log.debug('Failed to switch state to OFF');
                   }
                 );
             }
@@ -2389,7 +2405,7 @@ export class SyncBoxDevice {
           .getCharacteristic(this.Characteristic.Brightness)
           .on('set', (value, callback) => {
             // Saves the changes
-            platform.log.debug('Switch brightness to ' + value);
+            this.platform.log.debug('Switch brightness to ' + value);
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -2399,7 +2415,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch brightness to ' + value);
+                  this.platform.log.debug('Failed to switch brightness to ' + value);
                 }
               );
 
@@ -2509,9 +2525,9 @@ export class SyncBoxDevice {
               .value === value
           ) {
             if (value) {
-              platform.log.debug('Switch state is already ON');
+              this.platform.log.debug('Switch state is already ON');
             } else {
-              platform.log.debug('Switch state is already OFF');
+              this.platform.log.debug('Switch state is already OFF');
             }
             callback(null);
             return;
@@ -2519,7 +2535,7 @@ export class SyncBoxDevice {
 
           // Saves the changes
           if (value) {
-            platform.log.debug('Switch state to ON');
+            this.platform.log.debug('Switch state to ON');
             let onMode = platform.config.defaultOnMode;
             if (onMode === 'lastSyncMode') {
               if (
@@ -2534,16 +2550,18 @@ export class SyncBoxDevice {
             }
             platform.limiter
               .schedule(() => {
-                return platform.client.updateExecution({ mode: onMode });
+                return platform.client.updateExecution({
+                  mode: onMode,
+                });
               })
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to ON');
+                  this.platform.log.debug('Failed to switch state to ON');
                 }
               );
           } else {
-            platform.log.debug('Switch state to OFF');
+            this.platform.log.debug('Switch state to OFF');
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -2553,7 +2571,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch state to OFF');
+                  this.platform.log.debug('Failed to switch state to OFF');
                 }
               );
           }
@@ -2581,15 +2599,17 @@ export class SyncBoxDevice {
           const group = this.state.hue.groups[groupId];
 
           // Saves the changes
-          platform.log.debug('Switch entertainment area to ' + group.name);
+          this.platform.log.debug('Switch entertainment area to ' + group.name);
           platform.limiter
             .schedule(() => {
-              return platform.client.updateHue({ groupId: groupId });
+              return platform.client.updateHue({
+                groupId: groupId,
+              });
             })
             .then(
               () => {},
               () => {
-                platform.log.debug(
+                this.platform.log.debug(
                   'Failed to switch entertainment area to ' + group.name
                 );
               }
@@ -2625,12 +2645,12 @@ export class SyncBoxDevice {
       entertainmentTvService
         .getCharacteristic(this.Characteristic.RemoteKey)
         .on('set', (value, callback) => {
-          platform.log.debug('Remote key pressed: ' + value);
+          this.platform.log.debug('Remote key pressed: ' + value);
 
           let mode;
           switch (value) {
             case this.Characteristic.RemoteKey.ARROW_UP:
-              platform.log.debug('Increase brightness by 25%');
+              this.platform.log.debug('Increase brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -2643,13 +2663,13 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to increase brightness by 25%');
+                    this.platform.log.debug('Failed to increase brightness by 25%');
                   }
                 );
               break;
 
             case this.Characteristic.RemoteKey.ARROW_DOWN:
-              platform.log.debug('Decrease brightness by 25%');
+              this.platform.log.debug('Decrease brightness by 25%');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -2662,7 +2682,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to decrease brightness by 25%');
+                    this.platform.log.debug('Failed to decrease brightness by 25%');
                   }
                 );
               break;
@@ -2680,7 +2700,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use this as a key
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   break;
@@ -2694,7 +2713,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2708,7 +2727,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2722,7 +2741,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2742,7 +2761,6 @@ export class SyncBoxDevice {
               }
 
               this.platform.log.debug('Toggle intensity');
-              // @ts-expect-error need to use this as a key
               switch (this.state.execution[mode].intensity) {
                 case 'subtle':
                   platform.limiter
@@ -2754,7 +2772,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2768,7 +2786,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2782,7 +2800,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle intensity');
+                        this.platform.log.debug('Failed to toggle intensity');
                       }
                     );
                   break;
@@ -2802,7 +2820,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2814,7 +2832,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2828,7 +2846,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2840,7 +2858,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to toggle mode');
+                        this.platform.log.debug('Failed to toggle mode');
                       }
                     );
                   break;
@@ -2848,7 +2866,7 @@ export class SyncBoxDevice {
               break;
 
             case this.Characteristic.RemoteKey.PLAY_PAUSE:
-              platform.log.debug('Toggle switch state');
+              this.platform.log.debug('Toggle switch state');
               if (
                 this.state.execution.mode !== 'powersave' &&
                 this.state.execution.mode !== 'passthrough'
@@ -2862,7 +2880,7 @@ export class SyncBoxDevice {
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               } else {
@@ -2880,12 +2898,14 @@ export class SyncBoxDevice {
                 }
                 platform.limiter
                   .schedule(() => {
-                    return platform.client.updateExecution({ mode: onMode });
+                    return platform.client.updateExecution({
+                      mode: onMode,
+                    });
                   })
                   .then(
                     () => {},
                     () => {
-                      platform.log.debug('Failed to toggle switch state');
+                      this.platform.log.debug('Failed to toggle switch state');
                     }
                   );
               }
@@ -2904,7 +2924,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2918,7 +2938,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2932,7 +2952,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2946,7 +2966,7 @@ export class SyncBoxDevice {
                     .then(
                       () => {},
                       () => {
-                        platform.log.debug('Failed to switch hdmi source');
+                        this.platform.log.debug('Failed to switch hdmi source');
                       }
                     );
                   break;
@@ -2964,8 +2984,8 @@ export class SyncBoxDevice {
       // Handles the lightbulb accessory if it is enabled
       if (platform.config.entertainmentTvAccessoryLightbulb) {
         // Updates the light bulb service
-        // @ts-expect-error no subtype
         let entertainmentTvAccessoryLightBulbService =
+
           entertainmentTvAccessory.getServiceById(this.Service.Lightbulb);
         if (!entertainmentTvAccessoryLightBulbService) {
           entertainmentTvAccessoryLightBulbService =
@@ -2987,9 +3007,9 @@ export class SyncBoxDevice {
               ).value === value
             ) {
               if (value) {
-                platform.log.debug('Switch state is already ON');
+                this.platform.log.debug('Switch state is already ON');
               } else {
-                platform.log.debug('Switch state is already OFF');
+                this.platform.log.debug('Switch state is already OFF');
               }
               callback(null);
               return;
@@ -2997,7 +3017,7 @@ export class SyncBoxDevice {
 
             // Saves the changes
             if (value) {
-              platform.log.debug('Switch state to ON');
+              this.platform.log.debug('Switch state to ON');
               let onMode = platform.config.defaultOnMode;
               if (onMode === 'lastSyncMode') {
                 if (
@@ -3012,16 +3032,18 @@ export class SyncBoxDevice {
               }
               platform.limiter
                 .schedule(() => {
-                  return platform.client.updateExecution({ mode: onMode });
+                  return platform.client.updateExecution({
+                    mode: onMode,
+                  });
                 })
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to ON');
+                    this.platform.log.debug('Failed to switch state to ON');
                   }
                 );
             } else {
-              platform.log.debug('Switch state to OFF');
+              this.platform.log.debug('Switch state to OFF');
               platform.limiter
                 .schedule(() => {
                   return platform.client.updateExecution({
@@ -3031,7 +3053,7 @@ export class SyncBoxDevice {
                 .then(
                   () => {},
                   () => {
-                    platform.log.debug('Failed to switch state to OFF');
+                    this.platform.log.debug('Failed to switch state to OFF');
                   }
                 );
             }
@@ -3045,7 +3067,7 @@ export class SyncBoxDevice {
           .getCharacteristic(this.Characteristic.Brightness)
           .on('set', (value, callback) => {
             // Saves the changes
-            platform.log.debug('Switch brightness to ' + value);
+            this.platform.log.debug('Switch brightness to ' + value);
             platform.limiter
               .schedule(() => {
                 return platform.client.updateExecution({
@@ -3055,7 +3077,7 @@ export class SyncBoxDevice {
               .then(
                 () => {},
                 () => {
-                  platform.log.debug('Failed to switch brightness to ' + value);
+                  this.platform.log.debug('Failed to switch brightness to ' + value);
                 }
               );
 
@@ -3231,11 +3253,9 @@ export class SyncBoxDevice {
       }
 
       // Updates the intensity input characteristic
-      // @ts-expect-error need to use mode as a key
       this.platform.log.debug(
         'Updated intensity to ' + state.execution[mode].intensity
       );
-      // @ts-expect-error need to use mode as a key
       switch (state.execution[mode].intensity) {
         case 'subtle':
           this.intensityTvService.updateCharacteristic(

@@ -1,8 +1,9 @@
 import fetch from 'node-fetch';
-import { HueSyncBoxPlatform } from '../platform';
-import { Hue, State } from './state';
+import { HueSyncBoxPlatform } from './platform';
+import { State } from './state';
+import * as https from 'node:https';
 
-export class PhilipsHueSyncBoxClient {
+export class SyncBoxClient {
   private readonly platform: HueSyncBoxPlatform;
 
   constructor(platform: HueSyncBoxPlatform) {
@@ -26,17 +27,22 @@ export class PhilipsHueSyncBoxClient {
     path: string,
     body?: object
   ): Promise<T> {
-    const url = `https://${this.platform.config.ip}/api/v1/${path}`;
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+    const url = `https://${this.platform.config.syncBoxIpAddress}/api/v1/${path}`;
     const headers = {
       'Content-Type': 'application/json',
-      Authorization: this.platform.config.syncBoxApiAccessToken,
+      Authorization: `Bearer ${this.platform.config.syncBoxApiAccessToken}`,
     };
 
     const options = {
       headers,
       method,
       body: body ? JSON.stringify(body) : null,
+      agent: httpsAgent,
     };
+    this.platform.log.debug('Request to Sync Box:', url, JSON.stringify(options));
 
     return fetch(url, options)
       .then(res => {

@@ -5,13 +5,13 @@ import type {
   Logging,
   PlatformAccessory,
   Service,
-  HAP,
+  HAP, PlatformConfig,
 } from 'homebridge';
 
-import { HueSyncBoxPlatformConfig } from './lib/config';
-import { PhilipsHueSyncBoxClient } from './lib/philips-hue-sync-box-client';
+import { HueSyncBoxPlatformConfig } from './config';
 import Bottleneck from 'bottleneck';
 import { SyncBoxDevice } from './device';
+import { SyncBoxClient } from './client';
 
 /**
  * HomebridgePlatform
@@ -33,22 +33,24 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public readonly CustomCharacteristics: any;
   public readonly log: Logging | Console;
-  public readonly client: PhilipsHueSyncBoxClient;
+  public readonly client: SyncBoxClient;
   public readonly limiter: Bottleneck;
   public readonly api: API;
   private device: SyncBoxDevice | undefined;
 
   constructor(
     public readonly logger: Logging,
-    public readonly platformConfig: HueSyncBoxPlatformConfig,
+    public readonly platformConfig: PlatformConfig,
     public readonly apiInput: API
   ) {
     if (!apiInput) {
       throw new Error('API is not defined');
     }
-    this.config = platformConfig;
+    this.config = platformConfig as HueSyncBoxPlatformConfig;
     this.api = apiInput;
     this.log = logger ?? console;
+    this.log.debug('Config:', this.config);
+    this.log.info('Initializing platform:', this.config.name);
     // Checks if all required information is provided
     if (!this.config.syncBoxIpAddress || !this.config.syncBoxApiAccessToken) {
       this.log.error(
@@ -59,13 +61,13 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     this.Service = this.api.hap.Service;
     this.Characteristic = this.api.hap.Characteristic;
     this.HAP = this.api.hap;
-    this.client = new PhilipsHueSyncBoxClient(this);
+    this.client = new SyncBoxClient(this);
     this.limiter = new Bottleneck({
       maxConcurrent: 1,
       minTime: 1000.0 / this.config.requestsPerSecond,
     });
 
-    this.log.debug('Finished initializing platform:', this.config.name);
+    this.log.info('Finished initializing platform:', this.config.name);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
@@ -95,9 +97,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   async discoverDevices() {
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
+    //
     const state = await this.client.getState();
     this.device = new SyncBoxDevice(this, state);
     this.limiter.schedule(async () => {
