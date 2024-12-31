@@ -10,9 +10,9 @@ import type {
 } from 'homebridge';
 
 import { HueSyncBoxPlatformConfig } from './config';
-import Bottleneck from 'bottleneck';
 import { SyncBoxDevice } from './device';
 import { SyncBoxClient } from './lib/client';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -22,7 +22,6 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly accessories: Map<string, PlatformAccessory> = new Map();
   public readonly log: Logging | Console;
   public readonly client: SyncBoxClient;
-  public readonly limiter: Bottleneck;
   public readonly api: API;
   private device: SyncBoxDevice | undefined;
 
@@ -48,11 +47,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     this.Service = this.api.hap.Service;
     this.Characteristic = this.api.hap.Characteristic;
     this.HAP = this.api.hap;
-    this.client = new SyncBoxClient(this);
-    this.limiter = new Bottleneck({
-      maxConcurrent: 1,
-      minTime: 1000.0 / this.config.requestsPerSecond,
-    });
+    this.client = new SyncBoxClient(this.log, this.config);
 
     this.log.info('Finished initializing platform:', this.config.name);
 
@@ -70,10 +65,44 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   async discoverDevices() {
     const state = await this.client.getState();
     this.device = new SyncBoxDevice(this, state);
-    this.device.init();
-    await this.limiter.schedule(async () => {
+    const devices = this.device.discoverDevices();
+    // loop over the discovered devices and register each one if it has not already been registered
+    const uuids = devices.map(device => {
+      // generate a unique id for the accessory this should be generated from
+      // something globally unique, but constant, for example, the device serial
+      // number or MAC address
+      const newAccessory = device.accessory
+      const uuid = device.accessory.UUID
+      // see if an accessory with the same uuid has already been registered and restored from
+      // the cached devices we stored in the `configureAccessory` method above
+      const existingAccessory = this.accessories[uuid];
+      if(existingAccessory) {
+        this.api.updatePlatformAccessories([existingAccessory]);
+      } else {
+        this.log.info('Registering new accessory:', newAccessory);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+          newAccessory,
+        ]);
+      }
+      return uuid;
+    });
+    this.accessories.forEach(existingAccessory => {
+      if (!uuids.includes(existingAccessory.UUID)) {
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+          existingAccessory,
+        ]);
+        this.log.info(
+          'Removing existing accessory from cache:',
+          existingAccessory.displayName
+        );
+      }
+    });
+
+    this.device?.update(state);
+    setInterval(async () => {
+      this.log.debug('Updating state');
       const state = await this.client.getState();
       this.device?.update(state);
-    }, this.config.updateInterval);
+    }, this.config.updateInterval)
   }
 }

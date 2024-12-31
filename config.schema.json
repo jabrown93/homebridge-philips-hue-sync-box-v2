@@ -23,15 +23,25 @@
         "title": "Default ON mode",
         "type": "string",
         "required": false,
-        "placeholder": "video",
-        "description": "The mode that is used when switching the Sync Box on via HomeKit. Possible values are 'video', 'music', 'game' or 'lastSyncMode'."
+        "default": "video",
+        "description": "The mode that is used when switching the Sync Box on via HomeKit. Possible values are 'video', 'music', 'game' or 'lastSyncMode'.",
+        "oneOf": [
+          { "title": "Video", "enum": ["video"] },
+          { "title": "Music", "enum": ["music"] },
+          { "title": "Game", "enum": ["game"] },
+          { "title": "Last Sync Mode", "enum": ["lastSyncMode"] }
+        ]
       },
       "defaultOffMode": {
         "title": "Default OFF mode",
         "type": "string",
         "required": false,
-        "placeholder": "passthrough",
-        "description": "The mode that is used when switching the Sync Box off via HomeKit. Possible values are 'powersave' or 'passthrough'."
+        "default": "passthrough",
+        "description": "The mode that is used when switching the Sync Box off via HomeKit. Possible values are 'powersave' or 'passthrough'.",
+        "oneOf": [
+          { "title": "Passthrough", "enum": ["passthrough"] },
+          { "title": "Power Save", "enum": ["powersave"] }
+        ]
       },
       "baseAccessory": {
         "title": "Base Accessory Type",
@@ -153,7 +163,7 @@
       "apiPort": {
         "title": "API Port",
         "type": "integer",
-        "placeholder": "40220",
+        "default": "40220",
         "required": false,
         "description": "The port that the API (if enabled) runs on"
       },
@@ -166,16 +176,9 @@
       "updateInterval": {
         "title": "Update Interval",
         "type": "integer",
-        "default": 10000,
+        "default": 60000,
         "required": false,
         "description": "The interval in seconds in which the plugin checks for updates."
-      },
-      "requestsPerSecond": {
-        "title": "Requests per Second",
-        "type": "integer",
-        "default": 5,
-        "required": false,
-        "description": "The amount of requests that are allowed per second."
       }
     }
   }

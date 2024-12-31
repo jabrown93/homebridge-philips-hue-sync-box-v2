@@ -6,8 +6,11 @@ import type {
   UnknownContext,
   Characteristic,
   CharacteristicValue,
+  WithUUID,
 } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
+import { SwitchDevice } from './accessories/switch';
+import { BaseHueSyncBoxDevice } from './accessories/base';
 
 export class SyncBoxDevice {
   private readonly UUIDGen;
@@ -32,6 +35,7 @@ export class SyncBoxDevice {
   private entertainmentTvService: Service | undefined;
   private entertainmentTvAccessoryLightBulbService: Service | undefined;
 
+  private syncBoxDevices: BaseHueSyncBoxDevice[] = [];
   private readonly _powersave = 'powersave';
   private readonly _passthrough = 'passthrough';
   private readonly _video = 'video';
@@ -111,11 +115,11 @@ export class SyncBoxDevice {
       this.unusedDeviceAccessories.delete(this._lightBulbAccessory);
     } else {
       this.platform.log.info(
-        'Adding new accessory with kind LightBulbAccessory.'
+        'Adding new accessory with kind LightBulbAccessory.',
       );
       lightBulbAccessory = new this.Accessory(
         this.state.device.name,
-        this.UUIDGen.generate(this._lightBulbAccessory)
+        this.UUIDGen.generate(this._lightBulbAccessory),
       );
       lightBulbAccessory.context.kind = this._lightBulbAccessory;
       this.newDeviceAccessories.push(lightBulbAccessory);
@@ -129,29 +133,38 @@ export class SyncBoxDevice {
 
   private readonly _switchAccessory = 'SwitchAccessory';
 
-  private getSwitchAccessory(): PlatformAccessory | null {
-    let switchAccessory: PlatformAccessory;
-    if (this.platform.config.baseAccessory === this._switch) {
-      return null;
-    }
-    switchAccessory = this.unusedDeviceAccessories[this._switchAccessory];
-    if (switchAccessory) {
-      this.unusedDeviceAccessories.delete(this._switchAccessory);
-    } else {
-      this.platform.log.debug(
-        'Adding new accessory with kind SwitchAccessory.'
-      );
-      switchAccessory = new this.Accessory(
-        this.state.device.name,
-        this.UUIDGen.generate(this._switchAccessory)
-      );
-      switchAccessory.context.kind = this._switchAccessory;
-      this.newDeviceAccessories.push(switchAccessory);
-    }
-    this.deviceAccessories.push(switchAccessory);
-
+  private getSwitchAccessory(): PlatformAccessory {
+    this.platform.log.debug(
+      'Adding new accessory with kind SwitchAccessory.')
+    const switchAccessory = new this.Accessory(
+      this.state.device.name,
+      this.UUIDGen.generate(this._switchAccessory),
+    );
+    switchAccessory.context.kind = this._switchAccessory;
+    // this.platform.api.registerPlatformAccessories(
+    //   PLUGIN_NAME,
+    //   PLATFORM_NAME,
+    //   [switchAccessory]
+    // );
     this.mainAccessory = switchAccessory;
     return switchAccessory;
+  }
+
+  public discoverDevices(): BaseHueSyncBoxDevice[] {
+    this.platform.log.debug('Discovering devices');
+    const devices: BaseHueSyncBoxDevice[] = [];
+    if (this.platform.config.baseAccessory === this._switch) {
+      const ogSwitchAccessory = this.getSwitchAccessory();
+      const switchAccessory = new SwitchDevice(
+        this.platform,
+        ogSwitchAccessory,
+        this.platform.client,
+        this.state,
+      );
+      devices.push(switchAccessory);
+      this.syncBoxDevices.push(switchAccessory);
+    }
+    return devices;
   }
 
   public init(): void {
@@ -171,37 +184,37 @@ export class SyncBoxDevice {
     const intensityTvAccessory = this.getIntensityTvAccessory();
 
     // Gets the tv accessory
-    const entertainmentTvAccessory = this.getEntertainmentTvAccssory();
+    const entertainmentTvAccessory = this.getEntertainmentTvAccessory();
 
     // Registers the newly created accessories
     this.platform.api.registerPlatformAccessories(
       PLUGIN_NAME,
       PLATFORM_NAME,
-      this.newDeviceAccessories
+      this.newDeviceAccessories,
     );
 
     // Removes all unused accessories
     for (const key in this.unusedDeviceAccessories) {
       const unused = this.unusedDeviceAccessories[key];
       this.platform.log.debug(
-        'Removing unused accessory with kind ' + unused.context.kind + '.'
+        'Removing unused accessory with kind ' + unused.context.kind + '.',
       );
       this.platform.accessories.delete(unused.UUID);
     }
     this.platform.api.unregisterPlatformAccessories(
       PLUGIN_NAME,
       PLATFORM_NAME,
-      Array.from(this.unusedDeviceAccessories.values())
+      Array.from(this.unusedDeviceAccessories.values()),
     );
 
     // Updates the accessory information
     for (const deviceAccessory of this.deviceAccessories) {
       let accessoryInformationService = deviceAccessory.getService(
-        this.Service.AccessoryInformation
+        this.Service.AccessoryInformation,
       );
       if (!accessoryInformationService) {
         accessoryInformationService = deviceAccessory.addService(
-          this.Service.AccessoryInformation
+          this.Service.AccessoryInformation,
         );
       }
       accessoryInformationService
@@ -209,7 +222,7 @@ export class SyncBoxDevice {
         .setCharacteristic(this.Characteristic.Model, 'Sync Box')
         .setCharacteristic(
           this.Characteristic.FirmwareRevision,
-          this.state.device.firmwareVersion
+          this.state.device.firmwareVersion,
         );
 
       const kind = deviceAccessory.context.kind;
@@ -220,7 +233,7 @@ export class SyncBoxDevice {
 
       accessoryInformationService.setCharacteristic(
         this.Characteristic.SerialNumber,
-        this.state.device.uniqueId + suffix
+        this.state.device.uniqueId + suffix,
       );
     }
 
@@ -242,7 +255,7 @@ export class SyncBoxDevice {
     if (this.externalAccessories.length > 0) {
       this.platform.api.publishExternalAccessories(
         PLUGIN_NAME,
-        this.externalAccessories
+        this.externalAccessories,
       );
     }
 
@@ -263,7 +276,7 @@ export class SyncBoxDevice {
       const hdmiInputService = this.getInputService(
         tvAccessory,
         hdmiName,
-        hdmiName
+        hdmiName,
       );
 
       // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
@@ -272,7 +285,7 @@ export class SyncBoxDevice {
     }
     tvService.setCharacteristic(
       this.Characteristic.SleepDiscoveryMode,
-      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
     );
     tvService
       .getCharacteristic(this.Characteristic.Active)
@@ -299,11 +312,11 @@ export class SyncBoxDevice {
 
       // @ts-expect-error // already checked
       let tvAccessoryLightBulbService = tvAccessory.getServiceById(
-        this.Service.Lightbulb
+        this.Service.Lightbulb,
       );
       if (!tvAccessoryLightBulbService) {
         tvAccessoryLightBulbService = tvAccessory.addService(
-          this.Service.Lightbulb
+          this.Service.Lightbulb,
         );
       }
 
@@ -326,7 +339,7 @@ export class SyncBoxDevice {
     return (value: CharacteristicValue) => {
       service.setCharacteristic(
         this.Characteristic.CurrentVisibilityState,
-        value
+        value,
       );
     };
   }
@@ -338,11 +351,14 @@ export class SyncBoxDevice {
     });
   }
 
-  private setServiceActive(service: Service) {
+  private setServiceCharacteristic(
+    service: Service,
+    characteristic: WithUUID<new () => Characteristic>,
+  ) {
     return async (value: CharacteristicValue) => {
-      const currentVal =
-        service.getCharacteristic(this.Characteristic.Active).value ||
-        service.getCharacteristic(this.Characteristic.On).value;
+      this.platform.log.debug('Switch state to ' + value);
+      const currentVal = service.getCharacteristic(characteristic).value;
+      console.log('well it was called');
       // Ignores changes if the new value equals the old value
       if (currentVal === value) {
         return;
@@ -359,10 +375,18 @@ export class SyncBoxDevice {
         this.platform.log.debug('Switch state to OFF');
         mode = this.platform.config.defaultOffMode;
       }
-      await this.updateExecution({
+      return await this.updateExecution({
         mode,
       });
     };
+  }
+
+  private setServiceActive(service: Service) {
+    return this.setServiceCharacteristic(service, this.Characteristic.Active);
+  }
+
+  private setServiceOn(service: Service) {
+    return this.setServiceCharacteristic(service, this.Characteristic.On);
   }
 
   private getTvService(tvAccessory: PlatformAccessory<UnknownContext>) {
@@ -375,7 +399,7 @@ export class SyncBoxDevice {
         tvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
           this.mainAccessory.context.tvAccessoryConfiguredName ||
-            this.state.device.name
+          this.state.device.name,
         );
         tvService
           .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -386,7 +410,7 @@ export class SyncBoxDevice {
       } else {
         tvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
-          this.state.device.name
+          this.state.device.name,
         );
       }
     }
@@ -399,13 +423,13 @@ export class SyncBoxDevice {
     }
     let modeTvService = modeTvAccessory.getServiceById(
       this.Service.Television,
-      'ModeTVAccessory'
+      'ModeTVAccessory',
     );
     if (!modeTvService) {
       modeTvService = modeTvAccessory.addService(
         this.Service.Television,
         'Mode',
-        'ModeTVAccessory'
+        'ModeTVAccessory',
       );
 
       // Sets the TV name
@@ -413,7 +437,7 @@ export class SyncBoxDevice {
         modeTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
           this.mainAccessory.context.modeTvAccessoryConfiguredName ||
-            this.state.device.name
+          this.state.device.name,
         );
         modeTvService
           .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -424,7 +448,7 @@ export class SyncBoxDevice {
       } else {
         modeTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
-          this.state.device.name
+          this.state.device.name,
         );
       }
     }
@@ -435,7 +459,7 @@ export class SyncBoxDevice {
       const modeInputService = this.getInputService(
         modeTvAccessory,
         name,
-        position
+        position,
       );
       // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
       modeTvService.addLinkedService(modeInputService);
@@ -443,7 +467,7 @@ export class SyncBoxDevice {
     }
     modeTvService.setCharacteristic(
       this.Characteristic.SleepDiscoveryMode,
-      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
     );
     modeTvService
       .getCharacteristic(this.Characteristic.Active)
@@ -466,11 +490,11 @@ export class SyncBoxDevice {
       // Updates the light bulb service
       // @ts-expect-error // already checked
       let modeTvAccessoryLightBulbService = modeTvAccessory.getServiceById(
-        this.Service.Lightbulb
+        this.Service.Lightbulb,
       );
       if (!modeTvAccessoryLightBulbService) {
         modeTvAccessoryLightBulbService = modeTvAccessory.addService(
-          this.Service.Lightbulb
+          this.Service.Lightbulb,
         );
       }
 
@@ -480,9 +504,7 @@ export class SyncBoxDevice {
       // Subscribes for changes of the on characteristic
       modeTvAccessoryLightBulbService
         .getCharacteristic(this.Characteristic.On)
-        .onSet(
-          this.setServiceActive(modeTvAccessoryLightBulbService).bind(this)
-        );
+        .onSet(this.setServiceOn(modeTvAccessoryLightBulbService).bind(this));
 
       // Subscribes for changes of the brightness characteristic
       modeTvAccessoryLightBulbService
@@ -638,13 +660,13 @@ export class SyncBoxDevice {
       // Updates tv service
       let intensityTvService = intensityTvAccessory.getServiceById(
         this.Service.Television,
-        'IntensityTVAccessory'
+        'IntensityTVAccessory',
       );
       if (!intensityTvService) {
         intensityTvService = intensityTvAccessory.addService(
           this.Service.Television,
           'Intensity',
-          'IntensityTVAccessory'
+          'IntensityTVAccessory',
         );
 
         // Sets the TV name
@@ -652,7 +674,7 @@ export class SyncBoxDevice {
           intensityTvService.setCharacteristic(
             this.Characteristic.ConfiguredName,
             this.mainAccessory.context.intensityTvAccessoryConfiguredName ||
-              this.state.device.name
+            this.state.device.name,
           );
           intensityTvService
             .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -664,7 +686,7 @@ export class SyncBoxDevice {
         } else {
           intensityTvService.setCharacteristic(
             this.Characteristic.ConfiguredName,
-            this.state.device.name
+            this.state.device.name,
           );
         }
       }
@@ -676,7 +698,7 @@ export class SyncBoxDevice {
         const intensityInputService = this.getInputService(
           intensityTvAccessory,
           this.numberToIntensity[i],
-          position
+          position,
         );
 
         // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
@@ -687,7 +709,7 @@ export class SyncBoxDevice {
       // Sets sleep discovery characteristic (which is always discoverable as Homebridge is always running)
       intensityTvService.setCharacteristic(
         this.Characteristic.SleepDiscoveryMode,
-        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
+        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
       );
 
       // Handles on/off events
@@ -738,9 +760,7 @@ export class SyncBoxDevice {
         intensityTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.On)
           .onSet(
-            this.setServiceActive(intensityTvAccessoryLightBulbService).bind(
-              this
-            )
+            this.setServiceOn(intensityTvAccessoryLightBulbService).bind(this),
           );
 
         // Subscribes for changes of the brightness characteristic
@@ -754,17 +774,17 @@ export class SyncBoxDevice {
   private getInputService(
     tvAccessory: PlatformAccessory,
     name: string,
-    position: string
+    position: string,
   ): Service {
     let inputService = tvAccessory.getServiceById(
       this.Service.InputSource,
-      position
+      position,
     );
     if (!inputService) {
       inputService = tvAccessory.addService(
         this.Service.InputSource,
         position.toLowerCase().replace(' ', ''),
-        position
+        position,
       );
 
       // Sets the TV name
@@ -772,179 +792,156 @@ export class SyncBoxDevice {
         .setCharacteristic(this.Characteristic.ConfiguredName, name)
         .setCharacteristic(
           this.Characteristic.IsConfigured,
-          this.Characteristic.IsConfigured.CONFIGURED
+          this.Characteristic.IsConfigured.CONFIGURED,
         )
         .setCharacteristic(
           this.Characteristic.CurrentVisibilityState,
-          this.Characteristic.CurrentVisibilityState.SHOWN
+          this.Characteristic.CurrentVisibilityState.SHOWN,
         )
         .setCharacteristic(
           this.Characteristic.TargetVisibilityState,
-          this.Characteristic.TargetVisibilityState.SHOWN
+          this.Characteristic.TargetVisibilityState.SHOWN,
         );
     }
     inputService
       .setCharacteristic(
         this.Characteristic.Identifier,
-        position[position.length - 1]
+        position[position.length - 1],
       )
       .setCharacteristic(
         this.Characteristic.InputSourceType,
-        this.Characteristic.InputSourceType.HDMI
+        this.Characteristic.InputSourceType.HDMI,
       );
 
     return inputService;
   }
 
   private handleEntertainmentTv(
-    entertainmentTvAccessory: PlatformAccessory | null
+    entertainmentTvAccessory: PlatformAccessory | null,
   ) {
-    if (entertainmentTvAccessory) {
-      // Updates tv service
-      let entertainmentTvService = entertainmentTvAccessory.getServiceById(
+    if (!entertainmentTvAccessory) {
+      return;
+    }
+    let entertainmentTvService = entertainmentTvAccessory.getServiceById(
+      this.Service.Television,
+      'EntertainmentTVAccessory',
+    );
+    if (!entertainmentTvService) {
+      entertainmentTvService = entertainmentTvAccessory.addService(
         this.Service.Television,
-        'EntertainmentTVAccessory'
+        'Entertainment Area',
+        'EntertainmentTVAccessory',
       );
-      if (!entertainmentTvService) {
-        entertainmentTvService = entertainmentTvAccessory.addService(
-          this.Service.Television,
-          'Entertainment Area',
-          'EntertainmentTVAccessory'
+
+      // Sets the TV name
+      if (this.mainAccessory) {
+        entertainmentTvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.mainAccessory.context.entertainmentTvAccessoryConfiguredName ||
+          this.state.device.name,
         );
-
-        // Sets the TV name
-        if (this.mainAccessory) {
-          entertainmentTvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.mainAccessory.context.entertainmentTvAccessoryConfiguredName ||
-              this.state.device.name
-          );
-          entertainmentTvService
-            .getCharacteristic(this.Characteristic.ConfiguredName)
-            .onSet((value: CharacteristicValue) => {
-              // @ts-expect-error already checked
-              this.mainAccessory.context.entertainmentTvAccessoryConfiguredName =
-                value;
-            });
-        } else {
-          entertainmentTvService.setCharacteristic(
-            this.Characteristic.ConfiguredName,
-            this.state.device.name
-          );
-        }
+        entertainmentTvService
+          .getCharacteristic(this.Characteristic.ConfiguredName)
+          .onSet((value: CharacteristicValue) => {
+            // @ts-expect-error already checked
+            this.mainAccessory.context.entertainmentTvAccessoryConfiguredName =
+              value;
+          });
+      } else {
+        entertainmentTvService.setCharacteristic(
+          this.Characteristic.ConfiguredName,
+          this.state.device.name,
+        );
       }
+    }
+    const entertainmentInputServices: Service[] = [];
+    let i = 1;
+    for (const groupId in this.state.hue.groups) {
+      const group = this.state.hue.groups[groupId];
+      const name = group.name;
+      const position = 'AREA ' + i;
 
-      // Register input sources
-      const entertainmentInputServices: Service[] = [];
-      let i = 1;
+      const entertainmentInputService = this.getInputService(
+        entertainmentTvAccessory,
+        name,
+        position,
+      );
 
-      for (const groupId in this.state.hue.groups) {
+      // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
+      entertainmentTvService.addLinkedService(entertainmentInputService);
+      entertainmentInputServices.push(entertainmentInputService);
+
+      i++;
+    }
+    entertainmentTvService.setCharacteristic(
+      this.Characteristic.SleepDiscoveryMode,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+    );
+    entertainmentTvService
+      .getCharacteristic(this.Characteristic.Active)
+      .onSet(this.setServiceActive(entertainmentTvService).bind(this));
+    entertainmentTvService
+      .getCharacteristic(this.Characteristic.ActiveIdentifier)
+      .onSet(async value => {
+        // Gets the ID of the group based on the index
+        let groupId: string | null = null;
+        let i = 1;
+        for (const currentGroupId in this.state.hue.groups) {
+          if (i === value) {
+            groupId = currentGroupId;
+            break;
+          }
+          i++;
+        }
+
+        // @ts-expect-error need to use self as a key
         const group = this.state.hue.groups[groupId];
-        const name = group.name;
-        const position = 'AREA ' + i;
-
-        const entertainmentInputService = this.getInputService(
-          entertainmentTvAccessory,
-          name,
-          position
-        );
-
-        // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
-        entertainmentTvService.addLinkedService(entertainmentInputService);
-        entertainmentInputServices.push(entertainmentInputService);
-
-        i++;
-      }
-
-      // Sets sleep discovery characteristic (which is always discoverable as Homebridge is always running)
-      entertainmentTvService.setCharacteristic(
-        this.Characteristic.SleepDiscoveryMode,
-        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
-      );
-
-      // Handles on/off events
-      entertainmentTvService
-        .getCharacteristic(this.Characteristic.Active)
-        .onSet(this.setServiceActive(entertainmentTvService).bind(this));
-
-      // Handles input source changes
-      entertainmentTvService
-        .getCharacteristic(this.Characteristic.ActiveIdentifier)
-        .onSet(async value => {
-          // Gets the ID of the group based on the index
-          let groupId: string | null = null;
-          let i = 1;
-          for (const currentGroupId in this.state.hue.groups) {
-            if (i === value) {
-              groupId = currentGroupId;
-              break;
-            }
-            i++;
-          }
-
-          // @ts-expect-error need to use self as a key
-          const group = this.state.hue.groups[groupId];
-          if (!group || !groupId) {
-            return;
-          }
-          // Saves the changes
-          this.platform.log.debug('Switch entertainment area to ' + group.name);
-          try {
-            await this.platform.client.updateHue({
-              groupId: groupId,
-            });
-          } catch (e) {
-            this.platform.log.debug(
-              'Failed to switch entertainment area to ' + group.name,
-              e
-            );
-          }
-        });
-
-      this.updateSources(entertainmentInputServices);
-
-      // Handles remote key input
-      entertainmentTvService
-        .getCharacteristic(this.Characteristic.RemoteKey)
-        .onSet(this.handleRemoteButton.bind(this));
-
-      // Stores the tv service
-      this.entertainmentTvService = entertainmentTvService;
-
-      // Handles the lightbulb accessory if it is enabled
-      if (this.platform.config.entertainmentTvAccessoryLightbulb) {
-        // Updates the light bulb service
-        let entertainmentTvAccessoryLightBulbService =
-          // @ts-expect-error // already checked
-          entertainmentTvAccessory.getServiceById(this.Service.Lightbulb);
-        if (!entertainmentTvAccessoryLightBulbService) {
-          entertainmentTvAccessoryLightBulbService =
-            entertainmentTvAccessory.addService(this.Service.Lightbulb);
+        if (!group || !groupId) {
+          return;
         }
-
-        // Stores the light bulb service
-        this.entertainmentTvAccessoryLightBulbService =
-          entertainmentTvAccessoryLightBulbService;
-
-        // Subscribes for changes of the on characteristic
-        entertainmentTvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.On)
-          .onSet(
-            this.setServiceActive(
-              entertainmentTvAccessoryLightBulbService
-            ).bind(this)
+        // Saves the changes
+        this.platform.log.debug('Switch entertainment area to ' + group.name);
+        try {
+          await this.platform.client.updateHue({
+            groupId: groupId,
+          });
+        } catch (e) {
+          this.platform.log.debug(
+            'Failed to switch entertainment area to ' + group.name,
+            e,
           );
-
-        // Subscribes for changes of the brightness characteristic
-        entertainmentTvAccessoryLightBulbService
-          .getCharacteristic(this.Characteristic.Brightness)
-          .onSet(this.setBrightness.bind(this));
+        }
+      });
+    this.updateSources(entertainmentInputServices);
+    entertainmentTvService
+      .getCharacteristic(this.Characteristic.RemoteKey)
+      .onSet(this.handleRemoteButton.bind(this));
+    this.entertainmentTvService = entertainmentTvService;
+    if (this.platform.config.entertainmentTvAccessoryLightbulb) {
+      // Updates the light bulb service
+      let entertainmentTvAccessoryLightBulbService =
+        // @ts-expect-error // already checked
+        entertainmentTvAccessory.getServiceById(this.Service.Lightbulb);
+      if (!entertainmentTvAccessoryLightBulbService) {
+        entertainmentTvAccessoryLightBulbService =
+          entertainmentTvAccessory.addService(this.Service.Lightbulb);
       }
+
+      // Stores the light bulb service
+      this.entertainmentTvAccessoryLightBulbService =
+        entertainmentTvAccessoryLightBulbService;
+
+      // Subscribes for changes of the on characteristic
+      entertainmentTvAccessoryLightBulbService
+        .getCharacteristic(this.Characteristic.On)
+        .onSet(
+          this.setServiceOn(entertainmentTvAccessoryLightBulbService).bind(this),
+        );
     }
   }
 
   private handleSwitch(
-    switchAccessory: PlatformAccessory<UnknownContext> | null
+    switchAccessory: PlatformAccessory<UnknownContext> | null,
   ) {
     // Handles the switch accessory if it is enabled
     if (!switchAccessory) {
@@ -958,18 +955,18 @@ export class SyncBoxDevice {
     this.switchService = switchService;
     switchService
       .getCharacteristic(this.Characteristic.On)
-      .onSet(this.setServiceActive(switchService).bind(this));
+      .onSet(this.setServiceOn(this.switchService).bind(this));
   }
 
   private handleLightBulb(
-    lightBulbAccessory: PlatformAccessory<UnknownContext> | null
+    lightBulbAccessory: PlatformAccessory<UnknownContext> | null,
   ) {
     if (!lightBulbAccessory) {
       return;
     }
     // @ts-expect-error  already checked
     let lightBulbService = lightBulbAccessory.getServiceById(
-      this.Service.Lightbulb
+      this.Service.Lightbulb,
     );
     if (!lightBulbService) {
       lightBulbService = lightBulbAccessory.addService(this.Service.Lightbulb);
@@ -977,19 +974,19 @@ export class SyncBoxDevice {
     this.lightBulbService = lightBulbService;
     lightBulbService
       .getCharacteristic(this.Characteristic.On)
-      .onSet(this.setServiceActive(lightBulbService).bind(this));
+      .onSet(this.setServiceOn(lightBulbService).bind(this));
     lightBulbService
       .getCharacteristic(this.Characteristic.Brightness)
       .onSet(this.setBrightness.bind(this));
   }
 
-  private getEntertainmentTvAccssory() {
+  private getEntertainmentTvAccessory() {
     if (!this.platform.config.entertainmentTvAccessory) {
       return null;
     }
     return this.getBaseTvAccessory(
       'EntertainmentTVAccessory',
-      this.platform.config.entertainmentTvAccessoryType
+      this.platform.config.entertainmentTvAccessoryType,
     );
   }
 
@@ -999,7 +996,7 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'IntensityTVAccessory',
-      this.platform.config.intensityTvAccessoryType
+      this.platform.config.intensityTvAccessoryType,
     );
   }
 
@@ -1009,21 +1006,21 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'ModeTVAccessory',
-      this.platform.config.modeTvAccessoryType
+      this.platform.config.modeTvAccessoryType,
     );
   }
 
   private getBaseTvAccessory(accessoryName: string, accessoryType: string) {
     this.platform.log.debug(
       'Setting up accessory ' +
-        accessoryName +
-        ' with kind ' +
-        accessoryType +
-        '.'
+      accessoryName +
+      ' with kind ' +
+      accessoryType +
+      '.',
     );
     const accessory = new this.Accessory(
       this.state.device.name,
-      this.UUIDGen.generate(accessoryName)
+      this.UUIDGen.generate(accessoryName),
     );
     accessory.category = this.tvAccessoryTypesToCategory[accessoryType];
     accessory.context.kind = accessoryType;
@@ -1038,219 +1035,227 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'TVAccessory',
-      this.platform.config.tvAccessoryType
+      this.platform.config.tvAccessoryType,
     );
   }
 
-  public update(state: State): void {
-    // Stores the latest state
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    this.state = state;
-
-    // Updates the corresponding service
-    if (this.lightBulbService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.lightBulbService.updateCharacteristic(
-        this.Characteristic.On,
-        this.state.execution.mode !== this._powersave &&
-          this.state.execution.mode !== this._passthrough
-      );
-
-      // Updates the brightness characteristic
-      this.platform.log.debug(
-        'Updated brightness to ' + this.state.execution.brightness
-      );
-      this.lightBulbService.updateCharacteristic(
-        this.Characteristic.Brightness,
-        Math.round((state.execution.brightness / 200.0) * 100)
-      );
-    }
-
-    // Updates the corresponding service
-    if (this.switchService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.switchService.updateCharacteristic(
-        this.Characteristic.On,
-        this.state.execution.mode !== this._powersave &&
-          this.state.execution.mode !== this._passthrough
-      );
-    }
-
-    // Updates the corresponding service of the TV accessory
-    if (this.tvService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.tvService.updateCharacteristic(
-        this.Characteristic.Active,
-        this.state.execution.mode !== this._powersave
-      );
-
-      // Updates the HDMI input characteristic
-      this.platform.log.debug(
-        'Updated HDMI input to ' + this.state.execution.hdmiSource
-      );
-      this.tvService.updateCharacteristic(
-        this.Characteristic.ActiveIdentifier,
-        parseInt(state.execution.hdmiSource.replace('input', ''))
-      );
-
-      // Updates the corresponding service
-      if (this.tvAccessoryLightBulbService) {
-        // Updates the on characteristic
-        this.platform.log.debug(
-          'Updated state to ' + this.state.execution.mode
-        );
-        this.tvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.On,
-          this.state.execution.mode !== this._powersave &&
-            this.state.execution.mode !== this._passthrough
-        );
-
-        // Updates the brightness characteristic
-        this.platform.log.debug(
-          'Updated brightness to ' + this.state.execution.brightness
-        );
-        this.tvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.Brightness,
-          Math.round((state.execution.brightness / 200.0) * 100)
-        );
-      }
-    }
-
-    // Updates the corresponding service of the mode TV accessory
-    if (this.modeTvService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.modeTvService.updateCharacteristic(
-        this.Characteristic.Active,
-        this.state.execution.mode !== this._powersave
-      );
-
-      // Updates the mode input characteristic
-      this.platform.log.debug('Updated mode to ' + this.state.execution.mode);
-      this.modeTvService.updateCharacteristic(
-        this.Characteristic.ActiveIdentifier,
-        this.modeToNumber[state.execution.mode]
-      );
-
-      // Updates the corresponding service
-      if (this.modeTvAccessoryLightBulbService) {
-        // Updates the on characteristic
-        this.platform.log.debug(
-          'Updated state to ' + this.state.execution.mode
-        );
-        this.modeTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.On,
-          this.state.execution.mode !== this._powersave &&
-            this.state.execution.mode !== this._passthrough
-        );
-
-        // Updates the brightness characteristic
-        this.platform.log.debug(
-          'Updated brightness to ' + this.state.execution.brightness
-        );
-        this.modeTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.Brightness,
-          Math.round((state.execution.brightness / 200.0) * 100)
-        );
-      }
-    }
-
-    // Updates the corresponding service of the intensity TV accessory
-    if (this.intensityTvService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.intensityTvService.updateCharacteristic(
-        this.Characteristic.Active,
-        this.state.execution.mode !== this._powersave
-      );
-
-      // Gets the current mode or the last sync mode to set the intensity
-      const mode = this.getMode();
-
-      // Updates the intensity input characteristic
-      this.platform.log.debug(
-        'Updated intensity to ' + this.state.execution[mode].intensity
-      );
-      const brightness =
-        this.intensityToNumber[state.execution[mode].intensity];
-      if (brightness) {
-        this.intensityTvService.updateCharacteristic(
-          this.Characteristic.ActiveIdentifier,
-          brightness
-        );
-      }
-
-      // Updates the corresponding service
-      if (this.intensityTvAccessoryLightBulbService) {
-        // Updates the on characteristic
-        this.platform.log.debug(
-          'Updated state to ' + this.state.execution.mode
-        );
-        this.intensityTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.On,
-          this.state.execution.mode !== this._powersave &&
-            this.state.execution.mode !== this._passthrough
-        );
-
-        // Updates the brightness characteristic
-        this.platform.log.debug(
-          'Updated brightness to ' + this.state.execution.brightness
-        );
-        this.intensityTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.Brightness,
-          Math.round((state.execution.brightness / 200.0) * 100)
-        );
-      }
-    }
-
-    // Updates the corresponding service of the entertainment area TV accessory
-    if (this.entertainmentTvService) {
-      // Updates the on characteristic
-      this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-      this.entertainmentTvService.updateCharacteristic(
-        this.Characteristic.Active,
-        this.state.execution.mode !== this._powersave
-      );
-
-      // Gets the ID of the group based on the index
-      let index = 1;
-      for (const currentGroupId in this.state.hue.groups) {
-        if (currentGroupId === this.state.hue.groupId) {
-          break;
-        }
-        index++;
-      }
-
-      // Updates the input characteristic
-      this.entertainmentTvService.updateCharacteristic(
-        this.Characteristic.ActiveIdentifier,
-        index
-      );
-
-      // Updates the corresponding service
-      if (this.entertainmentTvAccessoryLightBulbService) {
-        // Updates the on characteristic
-        this.platform.log.debug(
-          'Updated state to ' + this.state.execution.mode
-        );
-        this.entertainmentTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.On,
-          this.state.execution.mode !== this._powersave &&
-            this.state.execution.mode !== this._passthrough
-        );
-
-        // Updates the brightness characteristic
-        this.platform.log.debug(
-          'Updated brightness to ' + this.state.execution.brightness
-        );
-        this.entertainmentTvAccessoryLightBulbService.updateCharacteristic(
-          this.Characteristic.Brightness,
-          Math.round((state.execution.brightness / 200.0) * 100)
-        );
-      }
+  public update(state: State) {
+    this.platform.log.debug('Updating state called');
+    for (const accessory of this.syncBoxDevices) {
+      this.platform.log.debug('Updating accessory ' + accessory.accessory.displayName);
+      accessory.update(state);
     }
   }
+
+  // public update(state: State): void {
+  //   // Stores the latest state
+  //   // eslint-disable-next-line @typescript-eslint/no-this-alias
+  //   this.state = state;
+  //
+  //   // Updates the corresponding service
+  //   if (this.lightBulbService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.lightBulbService.updateCharacteristic(
+  //       this.Characteristic.On,
+  //       this.state.execution.mode !== this._powersave &&
+  //         this.state.execution.mode !== this._passthrough
+  //     );
+  //
+  //     // Updates the brightness characteristic
+  //     this.platform.log.debug(
+  //       'Updated brightness to ' + this.state.execution.brightness
+  //     );
+  //     this.lightBulbService.updateCharacteristic(
+  //       this.Characteristic.Brightness,
+  //       Math.round((state.execution.brightness / 200.0) * 100)
+  //     );
+  //   }
+  //
+  //   // Updates the corresponding service
+  //   if (this.switchService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.switchService.updateCharacteristic(
+  //       this.Characteristic.On,
+  //       this.state.execution.mode !== this._powersave &&
+  //         this.state.execution.mode !== this._passthrough
+  //     );
+  //   }
+  //
+  //   // Updates the corresponding service of the TV accessory
+  //   if (this.tvService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.tvService.updateCharacteristic(
+  //       this.Characteristic.Active,
+  //       this.state.execution.mode !== this._powersave
+  //     );
+  //
+  //     // Updates the HDMI input characteristic
+  //     this.platform.log.debug(
+  //       'Updated HDMI input to ' + this.state.execution.hdmiSource
+  //     );
+  //     this.tvService.updateCharacteristic(
+  //       this.Characteristic.ActiveIdentifier,
+  //       parseInt(state.execution.hdmiSource.replace('input', ''))
+  //     );
+  //
+  //     // Updates the corresponding service
+  //     if (this.tvAccessoryLightBulbService) {
+  //       // Updates the on characteristic
+  //       this.platform.log.debug(
+  //         'Updated state to ' + this.state.execution.mode
+  //       );
+  //       this.tvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.On,
+  //         this.state.execution.mode !== this._powersave &&
+  //           this.state.execution.mode !== this._passthrough
+  //       );
+  //
+  //       // Updates the brightness characteristic
+  //       this.platform.log.debug(
+  //         'Updated brightness to ' + this.state.execution.brightness
+  //       );
+  //       this.tvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.Brightness,
+  //         Math.round((state.execution.brightness / 200.0) * 100)
+  //       );
+  //     }
+  //   }
+  //
+  //   // Updates the corresponding service of the mode TV accessory
+  //   if (this.modeTvService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.modeTvService.updateCharacteristic(
+  //       this.Characteristic.Active,
+  //       this.state.execution.mode !== this._powersave
+  //     );
+  //
+  //     // Updates the mode input characteristic
+  //     this.platform.log.debug('Updated mode to ' + this.state.execution.mode);
+  //     this.modeTvService.updateCharacteristic(
+  //       this.Characteristic.ActiveIdentifier,
+  //       this.modeToNumber[state.execution.mode]
+  //     );
+  //
+  //     // Updates the corresponding service
+  //     if (this.modeTvAccessoryLightBulbService) {
+  //       // Updates the on characteristic
+  //       this.platform.log.debug(
+  //         'Updated state to ' + this.state.execution.mode
+  //       );
+  //       this.modeTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.On,
+  //         this.state.execution.mode !== this._powersave &&
+  //           this.state.execution.mode !== this._passthrough
+  //       );
+  //
+  //       // Updates the brightness characteristic
+  //       this.platform.log.debug(
+  //         'Updated brightness to ' + this.state.execution.brightness
+  //       );
+  //       this.modeTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.Brightness,
+  //         Math.round((state.execution.brightness / 200.0) * 100)
+  //       );
+  //     }
+  //   }
+  //
+  //   // Updates the corresponding service of the intensity TV accessory
+  //   if (this.intensityTvService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.intensityTvService.updateCharacteristic(
+  //       this.Characteristic.Active,
+  //       this.state.execution.mode !== this._powersave
+  //     );
+  //
+  //     // Gets the current mode or the last sync mode to set the intensity
+  //     const mode = this.getMode();
+  //
+  //     // Updates the intensity input characteristic
+  //     this.platform.log.debug(
+  //       'Updated intensity to ' + this.state.execution[mode].intensity
+  //     );
+  //     const brightness =
+  //       this.intensityToNumber[state.execution[mode].intensity];
+  //     if (brightness) {
+  //       this.intensityTvService.updateCharacteristic(
+  //         this.Characteristic.ActiveIdentifier,
+  //         brightness
+  //       );
+  //     }
+  //
+  //     // Updates the corresponding service
+  //     if (this.intensityTvAccessoryLightBulbService) {
+  //       // Updates the on characteristic
+  //       this.platform.log.debug(
+  //         'Updated state to ' + this.state.execution.mode
+  //       );
+  //       this.intensityTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.On,
+  //         this.state.execution.mode !== this._powersave &&
+  //           this.state.execution.mode !== this._passthrough
+  //       );
+  //
+  //       // Updates the brightness characteristic
+  //       this.platform.log.debug(
+  //         'Updated brightness to ' + this.state.execution.brightness
+  //       );
+  //       this.intensityTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.Brightness,
+  //         Math.round((state.execution.brightness / 200.0) * 100)
+  //       );
+  //     }
+  //   }
+  //
+  //   // Updates the corresponding service of the entertainment area TV accessory
+  //   if (this.entertainmentTvService) {
+  //     // Updates the on characteristic
+  //     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
+  //     this.entertainmentTvService.updateCharacteristic(
+  //       this.Characteristic.Active,
+  //       this.state.execution.mode !== this._powersave
+  //     );
+  //
+  //     // Gets the ID of the group based on the index
+  //     let index = 1;
+  //     for (const currentGroupId in this.state.hue.groups) {
+  //       if (currentGroupId === this.state.hue.groupId) {
+  //         break;
+  //       }
+  //       index++;
+  //     }
+  //
+  //     // Updates the input characteristic
+  //     this.entertainmentTvService.updateCharacteristic(
+  //       this.Characteristic.ActiveIdentifier,
+  //       index
+  //     );
+  //
+  //     // Updates the corresponding service
+  //     if (this.entertainmentTvAccessoryLightBulbService) {
+  //       // Updates the on characteristic
+  //       this.platform.log.debug(
+  //         'Updated state to ' + this.state.execution.mode
+  //       );
+  //       this.entertainmentTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.On,
+  //         this.state.execution.mode !== this._powersave &&
+  //           this.state.execution.mode !== this._passthrough
+  //       );
+  //
+  //       // Updates the brightness characteristic
+  //       this.platform.log.debug(
+  //         'Updated brightness to ' + this.state.execution.brightness
+  //       );
+  //       this.entertainmentTvAccessoryLightBulbService.updateCharacteristic(
+  //         this.Characteristic.Brightness,
+  //         Math.round((state.execution.brightness / 200.0) * 100)
+  //       );
+  //     }
+  //   }
+  // }
 }
