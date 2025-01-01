@@ -71,12 +71,12 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       // generate a unique id for the accessory this should be generated from
       // something globally unique, but constant, for example, the device serial
       // number or MAC address
-      const newAccessory = device.accessory
-      const uuid = device.accessory.UUID
+      const newAccessory = device.accessory;
+      const uuid = device.accessory.UUID;
       // see if an accessory with the same uuid has already been registered and restored from
       // the cached devices we stored in the `configureAccessory` method above
       const existingAccessory = this.accessories[uuid];
-      if(existingAccessory) {
+      if (existingAccessory) {
         this.api.updatePlatformAccessories([existingAccessory]);
       } else {
         this.log.info('Registering new accessory:', newAccessory);
@@ -86,6 +86,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       }
       return uuid;
     });
+
     this.accessories.forEach(existingAccessory => {
       if (!uuids.includes(existingAccessory.UUID)) {
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
@@ -98,11 +99,20 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       }
     });
 
+    const externalAccessories = this.device.getExternalAccessories();
+    externalAccessories.forEach(externalAccessory => {
+      const uuid = externalAccessory.UUID;
+      const existingAccessory = this.accessories[uuid];
+      if (!existingAccessory) {
+        this.api.publishExternalAccessories(PLUGIN_NAME, [externalAccessory]);
+      }
+    });
+
     this.device?.update(state);
     setInterval(async () => {
       this.log.debug('Updating state');
       const state = await this.client.getState();
       this.device?.update(state);
-    }, this.config.updateInterval)
+    }, this.config.updateInterval);
   }
 }

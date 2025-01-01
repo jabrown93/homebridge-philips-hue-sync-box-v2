@@ -5,7 +5,10 @@ import { Logger } from 'homebridge';
 import { HueSyncBoxPlatformConfig } from '../config';
 
 export class SyncBoxClient {
-  constructor(private readonly log: Logger | Console, private readonly config: HueSyncBoxPlatformConfig) {}
+  constructor(
+    private readonly log: Logger | Console,
+    private readonly config: HueSyncBoxPlatformConfig
+  ) {}
 
   public getState(): Promise<State> {
     return this.sendRequest<State>('GET', '');
@@ -35,11 +38,7 @@ export class SyncBoxClient {
       agent: new https.Agent({ rejectUnauthorized: false }),
     };
 
-    this.log.debug(
-      'Request to Sync Box:',
-      url,
-      JSON.stringify(options)
-    );
+    this.log.debug('Request to Sync Box:', url, JSON.stringify(options));
 
     const res = await fetch(url, options);
     if (!res.ok) {
