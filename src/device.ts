@@ -115,11 +115,11 @@ export class SyncBoxDevice {
       this.unusedDeviceAccessories.delete(this._lightBulbAccessory);
     } else {
       this.platform.log.info(
-        'Adding new accessory with kind LightBulbAccessory.',
+        'Adding new accessory with kind LightBulbAccessory.'
       );
       lightBulbAccessory = new this.Accessory(
         this.state.device.name,
-        this.UUIDGen.generate(this._lightBulbAccessory),
+        this.UUIDGen.generate(this._lightBulbAccessory)
       );
       lightBulbAccessory.context.kind = this._lightBulbAccessory;
       this.newDeviceAccessories.push(lightBulbAccessory);
@@ -134,11 +134,10 @@ export class SyncBoxDevice {
   private readonly _switchAccessory = 'SwitchAccessory';
 
   private getSwitchAccessory(): PlatformAccessory {
-    this.platform.log.debug(
-      'Adding new accessory with kind SwitchAccessory.')
+    this.platform.log.debug('Adding new accessory with kind SwitchAccessory.');
     const switchAccessory = new this.Accessory(
       this.state.device.name,
-      this.UUIDGen.generate(this._switchAccessory),
+      this.UUIDGen.generate(this._switchAccessory)
     );
     switchAccessory.context.kind = this._switchAccessory;
     // this.platform.api.registerPlatformAccessories(
@@ -159,7 +158,7 @@ export class SyncBoxDevice {
         this.platform,
         ogSwitchAccessory,
         this.platform.client,
-        this.state,
+        this.state
       );
       devices.push(switchAccessory);
       this.syncBoxDevices.push(switchAccessory);
@@ -190,31 +189,31 @@ export class SyncBoxDevice {
     this.platform.api.registerPlatformAccessories(
       PLUGIN_NAME,
       PLATFORM_NAME,
-      this.newDeviceAccessories,
+      this.newDeviceAccessories
     );
 
     // Removes all unused accessories
     for (const key in this.unusedDeviceAccessories) {
       const unused = this.unusedDeviceAccessories[key];
       this.platform.log.debug(
-        'Removing unused accessory with kind ' + unused.context.kind + '.',
+        'Removing unused accessory with kind ' + unused.context.kind + '.'
       );
       this.platform.accessories.delete(unused.UUID);
     }
     this.platform.api.unregisterPlatformAccessories(
       PLUGIN_NAME,
       PLATFORM_NAME,
-      Array.from(this.unusedDeviceAccessories.values()),
+      Array.from(this.unusedDeviceAccessories.values())
     );
 
     // Updates the accessory information
     for (const deviceAccessory of this.deviceAccessories) {
       let accessoryInformationService = deviceAccessory.getService(
-        this.Service.AccessoryInformation,
+        this.Service.AccessoryInformation
       );
       if (!accessoryInformationService) {
         accessoryInformationService = deviceAccessory.addService(
-          this.Service.AccessoryInformation,
+          this.Service.AccessoryInformation
         );
       }
       accessoryInformationService
@@ -222,7 +221,7 @@ export class SyncBoxDevice {
         .setCharacteristic(this.Characteristic.Model, 'Sync Box')
         .setCharacteristic(
           this.Characteristic.FirmwareRevision,
-          this.state.device.firmwareVersion,
+          this.state.device.firmwareVersion
         );
 
       const kind = deviceAccessory.context.kind;
@@ -233,7 +232,7 @@ export class SyncBoxDevice {
 
       accessoryInformationService.setCharacteristic(
         this.Characteristic.SerialNumber,
-        this.state.device.uniqueId + suffix,
+        this.state.device.uniqueId + suffix
       );
     }
 
@@ -255,7 +254,7 @@ export class SyncBoxDevice {
     if (this.externalAccessories.length > 0) {
       this.platform.api.publishExternalAccessories(
         PLUGIN_NAME,
-        this.externalAccessories,
+        this.externalAccessories
       );
     }
 
@@ -276,7 +275,7 @@ export class SyncBoxDevice {
       const hdmiInputService = this.getInputService(
         tvAccessory,
         hdmiName,
-        hdmiName,
+        hdmiName
       );
 
       // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
@@ -285,7 +284,7 @@ export class SyncBoxDevice {
     }
     tvService.setCharacteristic(
       this.Characteristic.SleepDiscoveryMode,
-      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
     );
     tvService
       .getCharacteristic(this.Characteristic.Active)
@@ -312,11 +311,11 @@ export class SyncBoxDevice {
 
       // @ts-expect-error // already checked
       let tvAccessoryLightBulbService = tvAccessory.getServiceById(
-        this.Service.Lightbulb,
+        this.Service.Lightbulb
       );
       if (!tvAccessoryLightBulbService) {
         tvAccessoryLightBulbService = tvAccessory.addService(
-          this.Service.Lightbulb,
+          this.Service.Lightbulb
         );
       }
 
@@ -339,7 +338,7 @@ export class SyncBoxDevice {
     return (value: CharacteristicValue) => {
       service.setCharacteristic(
         this.Characteristic.CurrentVisibilityState,
-        value,
+        value
       );
     };
   }
@@ -353,7 +352,7 @@ export class SyncBoxDevice {
 
   private setServiceCharacteristic(
     service: Service,
-    characteristic: WithUUID<new () => Characteristic>,
+    characteristic: WithUUID<new () => Characteristic>
   ) {
     return async (value: CharacteristicValue) => {
       this.platform.log.debug('Switch state to ' + value);
@@ -399,7 +398,7 @@ export class SyncBoxDevice {
         tvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
           this.mainAccessory.context.tvAccessoryConfiguredName ||
-          this.state.device.name,
+            this.state.device.name
         );
         tvService
           .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -410,7 +409,7 @@ export class SyncBoxDevice {
       } else {
         tvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
-          this.state.device.name,
+          this.state.device.name
         );
       }
     }
@@ -423,13 +422,13 @@ export class SyncBoxDevice {
     }
     let modeTvService = modeTvAccessory.getServiceById(
       this.Service.Television,
-      'ModeTVAccessory',
+      'ModeTVAccessory'
     );
     if (!modeTvService) {
       modeTvService = modeTvAccessory.addService(
         this.Service.Television,
         'Mode',
-        'ModeTVAccessory',
+        'ModeTVAccessory'
       );
 
       // Sets the TV name
@@ -437,7 +436,7 @@ export class SyncBoxDevice {
         modeTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
           this.mainAccessory.context.modeTvAccessoryConfiguredName ||
-          this.state.device.name,
+            this.state.device.name
         );
         modeTvService
           .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -448,7 +447,7 @@ export class SyncBoxDevice {
       } else {
         modeTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
-          this.state.device.name,
+          this.state.device.name
         );
       }
     }
@@ -459,7 +458,7 @@ export class SyncBoxDevice {
       const modeInputService = this.getInputService(
         modeTvAccessory,
         name,
-        position,
+        position
       );
       // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
       modeTvService.addLinkedService(modeInputService);
@@ -467,7 +466,7 @@ export class SyncBoxDevice {
     }
     modeTvService.setCharacteristic(
       this.Characteristic.SleepDiscoveryMode,
-      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
     );
     modeTvService
       .getCharacteristic(this.Characteristic.Active)
@@ -490,11 +489,11 @@ export class SyncBoxDevice {
       // Updates the light bulb service
       // @ts-expect-error // already checked
       let modeTvAccessoryLightBulbService = modeTvAccessory.getServiceById(
-        this.Service.Lightbulb,
+        this.Service.Lightbulb
       );
       if (!modeTvAccessoryLightBulbService) {
         modeTvAccessoryLightBulbService = modeTvAccessory.addService(
-          this.Service.Lightbulb,
+          this.Service.Lightbulb
         );
       }
 
@@ -660,13 +659,13 @@ export class SyncBoxDevice {
       // Updates tv service
       let intensityTvService = intensityTvAccessory.getServiceById(
         this.Service.Television,
-        'IntensityTVAccessory',
+        'IntensityTVAccessory'
       );
       if (!intensityTvService) {
         intensityTvService = intensityTvAccessory.addService(
           this.Service.Television,
           'Intensity',
-          'IntensityTVAccessory',
+          'IntensityTVAccessory'
         );
 
         // Sets the TV name
@@ -674,7 +673,7 @@ export class SyncBoxDevice {
           intensityTvService.setCharacteristic(
             this.Characteristic.ConfiguredName,
             this.mainAccessory.context.intensityTvAccessoryConfiguredName ||
-            this.state.device.name,
+              this.state.device.name
           );
           intensityTvService
             .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -686,7 +685,7 @@ export class SyncBoxDevice {
         } else {
           intensityTvService.setCharacteristic(
             this.Characteristic.ConfiguredName,
-            this.state.device.name,
+            this.state.device.name
           );
         }
       }
@@ -698,7 +697,7 @@ export class SyncBoxDevice {
         const intensityInputService = this.getInputService(
           intensityTvAccessory,
           this.numberToIntensity[i],
-          position,
+          position
         );
 
         // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
@@ -709,7 +708,7 @@ export class SyncBoxDevice {
       // Sets sleep discovery characteristic (which is always discoverable as Homebridge is always running)
       intensityTvService.setCharacteristic(
         this.Characteristic.SleepDiscoveryMode,
-        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+        this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
       );
 
       // Handles on/off events
@@ -760,7 +759,7 @@ export class SyncBoxDevice {
         intensityTvAccessoryLightBulbService
           .getCharacteristic(this.Characteristic.On)
           .onSet(
-            this.setServiceOn(intensityTvAccessoryLightBulbService).bind(this),
+            this.setServiceOn(intensityTvAccessoryLightBulbService).bind(this)
           );
 
         // Subscribes for changes of the brightness characteristic
@@ -774,17 +773,17 @@ export class SyncBoxDevice {
   private getInputService(
     tvAccessory: PlatformAccessory,
     name: string,
-    position: string,
+    position: string
   ): Service {
     let inputService = tvAccessory.getServiceById(
       this.Service.InputSource,
-      position,
+      position
     );
     if (!inputService) {
       inputService = tvAccessory.addService(
         this.Service.InputSource,
         position.toLowerCase().replace(' ', ''),
-        position,
+        position
       );
 
       // Sets the TV name
@@ -792,45 +791,45 @@ export class SyncBoxDevice {
         .setCharacteristic(this.Characteristic.ConfiguredName, name)
         .setCharacteristic(
           this.Characteristic.IsConfigured,
-          this.Characteristic.IsConfigured.CONFIGURED,
+          this.Characteristic.IsConfigured.CONFIGURED
         )
         .setCharacteristic(
           this.Characteristic.CurrentVisibilityState,
-          this.Characteristic.CurrentVisibilityState.SHOWN,
+          this.Characteristic.CurrentVisibilityState.SHOWN
         )
         .setCharacteristic(
           this.Characteristic.TargetVisibilityState,
-          this.Characteristic.TargetVisibilityState.SHOWN,
+          this.Characteristic.TargetVisibilityState.SHOWN
         );
     }
     inputService
       .setCharacteristic(
         this.Characteristic.Identifier,
-        position[position.length - 1],
+        position[position.length - 1]
       )
       .setCharacteristic(
         this.Characteristic.InputSourceType,
-        this.Characteristic.InputSourceType.HDMI,
+        this.Characteristic.InputSourceType.HDMI
       );
 
     return inputService;
   }
 
   private handleEntertainmentTv(
-    entertainmentTvAccessory: PlatformAccessory | null,
+    entertainmentTvAccessory: PlatformAccessory | null
   ) {
     if (!entertainmentTvAccessory) {
       return;
     }
     let entertainmentTvService = entertainmentTvAccessory.getServiceById(
       this.Service.Television,
-      'EntertainmentTVAccessory',
+      'EntertainmentTVAccessory'
     );
     if (!entertainmentTvService) {
       entertainmentTvService = entertainmentTvAccessory.addService(
         this.Service.Television,
         'Entertainment Area',
-        'EntertainmentTVAccessory',
+        'EntertainmentTVAccessory'
       );
 
       // Sets the TV name
@@ -838,7 +837,7 @@ export class SyncBoxDevice {
         entertainmentTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
           this.mainAccessory.context.entertainmentTvAccessoryConfiguredName ||
-          this.state.device.name,
+            this.state.device.name
         );
         entertainmentTvService
           .getCharacteristic(this.Characteristic.ConfiguredName)
@@ -850,7 +849,7 @@ export class SyncBoxDevice {
       } else {
         entertainmentTvService.setCharacteristic(
           this.Characteristic.ConfiguredName,
-          this.state.device.name,
+          this.state.device.name
         );
       }
     }
@@ -864,7 +863,7 @@ export class SyncBoxDevice {
       const entertainmentInputService = this.getInputService(
         entertainmentTvAccessory,
         name,
-        position,
+        position
       );
 
       // Adds the input as a linked service, which is important so that the input is properly displayed in the Home app
@@ -875,7 +874,7 @@ export class SyncBoxDevice {
     }
     entertainmentTvService.setCharacteristic(
       this.Characteristic.SleepDiscoveryMode,
-      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+      this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
     );
     entertainmentTvService
       .getCharacteristic(this.Characteristic.Active)
@@ -908,7 +907,7 @@ export class SyncBoxDevice {
         } catch (e) {
           this.platform.log.debug(
             'Failed to switch entertainment area to ' + group.name,
-            e,
+            e
           );
         }
       });
@@ -935,13 +934,13 @@ export class SyncBoxDevice {
       entertainmentTvAccessoryLightBulbService
         .getCharacteristic(this.Characteristic.On)
         .onSet(
-          this.setServiceOn(entertainmentTvAccessoryLightBulbService).bind(this),
+          this.setServiceOn(entertainmentTvAccessoryLightBulbService).bind(this)
         );
     }
   }
 
   private handleSwitch(
-    switchAccessory: PlatformAccessory<UnknownContext> | null,
+    switchAccessory: PlatformAccessory<UnknownContext> | null
   ) {
     // Handles the switch accessory if it is enabled
     if (!switchAccessory) {
@@ -959,14 +958,14 @@ export class SyncBoxDevice {
   }
 
   private handleLightBulb(
-    lightBulbAccessory: PlatformAccessory<UnknownContext> | null,
+    lightBulbAccessory: PlatformAccessory<UnknownContext> | null
   ) {
     if (!lightBulbAccessory) {
       return;
     }
     // @ts-expect-error  already checked
     let lightBulbService = lightBulbAccessory.getServiceById(
-      this.Service.Lightbulb,
+      this.Service.Lightbulb
     );
     if (!lightBulbService) {
       lightBulbService = lightBulbAccessory.addService(this.Service.Lightbulb);
@@ -986,7 +985,7 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'EntertainmentTVAccessory',
-      this.platform.config.entertainmentTvAccessoryType,
+      this.platform.config.entertainmentTvAccessoryType
     );
   }
 
@@ -996,7 +995,7 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'IntensityTVAccessory',
-      this.platform.config.intensityTvAccessoryType,
+      this.platform.config.intensityTvAccessoryType
     );
   }
 
@@ -1006,21 +1005,21 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'ModeTVAccessory',
-      this.platform.config.modeTvAccessoryType,
+      this.platform.config.modeTvAccessoryType
     );
   }
 
   private getBaseTvAccessory(accessoryName: string, accessoryType: string) {
     this.platform.log.debug(
       'Setting up accessory ' +
-      accessoryName +
-      ' with kind ' +
-      accessoryType +
-      '.',
+        accessoryName +
+        ' with kind ' +
+        accessoryType +
+        '.'
     );
     const accessory = new this.Accessory(
       this.state.device.name,
-      this.UUIDGen.generate(accessoryName),
+      this.UUIDGen.generate(accessoryName)
     );
     accessory.category = this.tvAccessoryTypesToCategory[accessoryType];
     accessory.context.kind = accessoryType;
@@ -1035,14 +1034,16 @@ export class SyncBoxDevice {
     }
     return this.getBaseTvAccessory(
       'TVAccessory',
-      this.platform.config.tvAccessoryType,
+      this.platform.config.tvAccessoryType
     );
   }
 
   public update(state: State) {
     this.platform.log.debug('Updating state called');
     for (const accessory of this.syncBoxDevices) {
-      this.platform.log.debug('Updating accessory ' + accessory.accessory.displayName);
+      this.platform.log.debug(
+        'Updating accessory ' + accessory.accessory.displayName
+      );
       accessory.update(state);
     }
   }

@@ -80,7 +80,7 @@ export class SwitchDevice extends BaseHueSyncBoxDevice {
     // }, 10000);
   }
 
-  public update(state :State) {
+  public update(state: State) {
     // Updates the on characteristic
     this.state = state;
     this.platform.log.debug('Updated state to ' + this.state.execution.mode);

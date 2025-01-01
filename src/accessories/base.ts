@@ -1,5 +1,9 @@
 import { Execution, State } from '../state';
-import { type CharacteristicValue, PlatformAccessory, UnknownContext } from 'homebridge';
+import {
+  type CharacteristicValue,
+  PlatformAccessory,
+  UnknownContext,
+} from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
 import { SyncBoxClient } from '../lib/client';
 
