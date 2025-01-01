@@ -1,6 +1,4 @@
-import type {
-  PlatformAccessory,
-} from 'homebridge';
+import type { CharacteristicValue, PlatformAccessory } from 'homebridge';
 
 import { HueSyncBoxPlatform } from '../platform';
 import { State } from '../state';

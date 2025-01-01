@@ -245,4 +245,66 @@ export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
       Math.round((this.state.execution.brightness / 200.0) * 100)
     );
   }
+
+  protected getInputService(name: string, position: string): Service {
+    const inputService =
+      this.accessory.getServiceById(
+        this.platform.Service.InputSource,
+        position
+      ) ||
+      this.accessory.addService(
+        this.platform.Service.InputSource,
+        position.toLowerCase().replace(' ', ''),
+        position
+      );
+
+    // Sets the TV name
+    inputService
+      .setCharacteristic(this.platform.Characteristic.ConfiguredName, name)
+      .setCharacteristic(
+        this.platform.Characteristic.IsConfigured,
+        this.platform.Characteristic.IsConfigured.CONFIGURED
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.CurrentVisibilityState,
+        this.platform.Characteristic.CurrentVisibilityState.SHOWN
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.TargetVisibilityState,
+        this.platform.Characteristic.TargetVisibilityState.SHOWN
+      );
+    inputService
+      .setCharacteristic(
+        this.platform.Characteristic.Identifier,
+        position[position.length - 1]
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.InputSourceType,
+        this.platform.Characteristic.InputSourceType.HDMI
+      );
+
+    return inputService;
+  }
+
+  protected setVisibility(service: Service) {
+    return (value: CharacteristicValue) => {
+      service.setCharacteristic(
+        this.platform.Characteristic.CurrentVisibilityState,
+        value
+      );
+    };
+  }
+
+  protected getMode() {
+    let mode = 'video';
+    if (
+      this.state.execution.mode !== POWER_SAVE &&
+      this.state.execution.mode !== PASSTHROUGH
+    ) {
+      mode = this.state.execution.mode;
+    } else if (this.state.execution.lastSyncMode) {
+      mode = this.state.execution.lastSyncMode;
+    }
+    return mode;
+  }
 }
