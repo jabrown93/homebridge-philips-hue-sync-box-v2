@@ -1,31 +1,56 @@
 {
-  "bridge": {
-    "name": "PluginTemplate",
-    "username": "AA:BB:CC:DD:EE:FF",
-    "port": 51826,
-    "pin": "031-45-154"
-  },
-  "description": "HomeBridge HTTP Status Control",
-  "plugins": [
-    "homebridge-plugin-name",
-    "homebridge-config-ui-x"
-  ],
-  "platforms": [
-    {
-      "name": "Config",
-      "port": 8581,
-      "auth": "none",
-      "theme": "auto",
-      "tempUnits": "c",
-      "lang": "auto",
-      "sudo": false,
-      "platform": "config",
-      "debug": false
+    "bridge": {
+        "name": "PluginTemplate",
+        "username": "AA:BB:CC:DD:EE:FF",
+        "port": 51826,
+        "pin": "031-45-154"
     },
-    {
-      "name": "homebridge-plugin-name",
-      "platform": "ExampleHomebridgePlugin"
-    }
-  ],
-  "accessories": []
+    "description": "HomeBridge HTTP Status Control",
+    "plugins": [
+        "homebridge-config-ui-x"
+    ],
+    "platforms": [
+        {
+            "name": "Config",
+            "port": 8581,
+            "platform": "config",
+            "log": {
+                "method": "file",
+                "path": "./homebridge.log"
+            }
+        },
+        {
+            "log": {
+                "method": "file",
+                "path": "./homebridge.log"
+            },
+            "syncBoxIpAddress": "",
+            "syncBoxApiAccessToken": ""
+            "tvAccessory": false,
+            "tvAccessoryType": "TV",
+            "tvAccessoryLightbulb": false,
+            "modeTvAccessory": false,
+            "modeTvAccessoryType": "TV",
+            "modeTvAccessoryLightbulb": false,
+            "intensityTvAccessory": false,
+            "intensityTvAccessoryType": "TV",
+            "intensityTvAccessoryLightbulb": false,
+            "entertainmentTvAccessory": false,
+            "entertainmentTvAccessoryType": "TV",
+            "entertainmentTvAccessoryLightbulb": false,
+            "isApiEnabled": false,
+            "_bridge": {
+                "name": "Living Room Sync Box",
+                "username": "0E:41:FB:40:CB:B6",
+                "manufacturer": "Philips",
+                "model": "Hue HDMI Sync Box 2.1"
+            },
+            "platform": "PhilipsHueSyncBoxPlatform"
+        }
+    ],
+    "log": {
+        "method": "file",
+        "path": "./homebridge.log"
+    },
+    "accessories": []
 }
