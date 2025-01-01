@@ -80,7 +80,10 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       // the cached devices we stored in the `configureAccessory` method above
       const existingAccessory = this.accessories.get(uuid);
       if (existingAccessory) {
-        this.log.debug('Updating existing accessory:', existingAccessory.displayName);
+        this.log.debug(
+          'Updating existing accessory:',
+          existingAccessory.displayName
+        );
         this.api.updatePlatformAccessories([existingAccessory]);
       } else {
         this.log.info('Registering new accessory:', newAccessory.context.kind);

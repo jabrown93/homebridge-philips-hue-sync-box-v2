@@ -125,7 +125,7 @@ export interface Ir {
   defaultCodes: boolean;
   scan: IrScan;
   codes: {
-    [key: string]: any;
+    [key: string]: never;
   };
 }
 
@@ -149,6 +149,6 @@ export interface State {
     [key: string]: Registration;
   };
   presets: {
-    [key: string]: any;
+    [key: string]: never;
   };
 }

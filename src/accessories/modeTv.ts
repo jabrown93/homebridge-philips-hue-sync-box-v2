@@ -1,4 +1,3 @@
-import { BaseHueSyncBoxDevice } from './base';
 import type {
   CharacteristicValue,
   PlatformAccessory,

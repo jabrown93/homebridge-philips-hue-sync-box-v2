@@ -47,6 +47,6 @@ export class SyncBoxClient {
       );
       throw new Error(`Error: ${res.status} - ${res.statusText}`);
     }
-    return method === 'GET' ? ((await res.json()) as T) : null as T;
+    return method === 'GET' ? ((await res.json()) as T) : (null as T);
   }
 }

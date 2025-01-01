@@ -34,9 +34,9 @@ export abstract class BaseHueSyncBoxDevice {
       this.getServiceSubType() !== undefined
         ? this.accessory.getService(this.getServiceType())
         : this.accessory.getServiceById(
-            this.getServiceType(),
+          this.getServiceType(),
             this.getServiceSubType() as string
-          );
+        );
 
     this.service =
       existingService ||
@@ -94,7 +94,6 @@ export abstract class BaseHueSyncBoxDevice {
     newValue: CharacteristicValue
   ) {
     this.platform.log.debug('Switch state to ' + newValue);
-    console.log('well it was called');
     // Ignores changes if the new value equals the old value
     if (currentVal === newValue) {
       return;
