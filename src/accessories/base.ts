@@ -30,12 +30,16 @@ export abstract class BaseHueSyncBoxDevice {
     this.client = client;
     this.state = state;
 
+    const existingService =
+      this.getServiceSubType() !== undefined
+        ? this.accessory.getService(this.getServiceType())
+        : this.accessory.getServiceById(
+            this.getServiceType(),
+            this.getServiceSubType() as string
+          );
+
     this.service =
-      this.accessory.getServiceById(
-        this.getServiceType(),
-        // @ts-expect-error sometimes the service sub type is undefined
-        this.getServiceSubType()
-      ) ||
+      existingService ||
       this.accessory.addService(
         this.getServiceType(),
         this.getServiceName(),
