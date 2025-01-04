@@ -2,7 +2,6 @@ import { SyncBoxDevice } from './base';
 import type { PlatformAccessory } from 'homebridge';
 import { State } from '../state';
 import { HueSyncBoxPlatform } from '../platform';
-import { SyncBoxClient } from '../lib/client';
 
 export class LightbulbDevice extends SyncBoxDevice {
   constructor(

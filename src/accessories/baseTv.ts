@@ -40,7 +40,7 @@ export abstract class BaseTvDevice extends SyncBoxDevice {
     [4, 'passthrough'],
   ]);
 
-  constructor(
+  protected constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
     protected state: State
