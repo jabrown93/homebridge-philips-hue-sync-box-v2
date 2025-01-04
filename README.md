@@ -14,7 +14,6 @@
 ![NPM Version (with dist tag)](https://img.shields.io/npm/v/@jabrown93/homebridge-philips-hue-sync-box/latest)
 ![NPM License](https://img.shields.io/npm/l/@jabrown93/homebridge-philips-hue-sync-box)
 
-
 ## Typescript rewrite of the [Homebridge Philips Hue Sync Box Plugin](https://github.com/lukasroegner/homebridge-philips-hue-sync-box) by [lukasroegner](https://github.com/lukasroegner).
 
 Homebridge plugin for the Philips Hue Sync Box.
