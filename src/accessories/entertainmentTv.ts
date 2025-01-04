@@ -1,6 +1,5 @@
 import type { CharacteristicValue, PlatformAccessory } from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
-import { SyncBoxClient } from '../lib/client';
 import { State } from '../state';
 import { BaseTvDevice } from './baseTv';
 
@@ -8,10 +7,9 @@ export class EntertainmentTvDevice extends BaseTvDevice {
   constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
-    protected client: SyncBoxClient,
     protected state: State
   ) {
-    super(platform, accessory, client, state);
+    super(platform, accessory, state);
 
     this.service.setCharacteristic(
       this.platform.Characteristic.SleepDiscoveryMode,
@@ -79,12 +77,12 @@ export class EntertainmentTvDevice extends BaseTvDevice {
     return this.updateMode(currentVal, value);
   }
 
-  setOnLightBulb(value: CharacteristicValue) {
-    if (!this.lightBulbService) {
+  setOnLightbulb(value: CharacteristicValue) {
+    if (!this.lightbulbService) {
       return;
     }
     this.platform.log.debug('Set On ->', value);
-    const currentVal = this.lightBulbService.getCharacteristic(
+    const currentVal = this.lightbulbService.getCharacteristic(
       this.platform.Characteristic.On
     ).value;
     return this.updateMode(currentVal, value);
@@ -102,7 +100,7 @@ export class EntertainmentTvDevice extends BaseTvDevice {
     return 'Entertainment Area';
   }
 
-  protected isLightBulbEnabled(): boolean {
+  protected isLightbulbEnabled(): boolean {
     return this.platform.config.intensityTvAccessoryLightbulb;
   }
 

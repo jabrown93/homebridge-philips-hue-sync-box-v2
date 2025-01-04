@@ -4,18 +4,16 @@ import type {
   Service,
 } from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
-import { SyncBoxClient } from '../lib/client';
 import { State } from '../state';
 import { BaseTvDevice } from './baseTv';
 
-export class ModeDevice extends BaseTvDevice {
+export class ModeTvDevice extends BaseTvDevice {
   constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
-    protected client: SyncBoxClient,
     protected state: State
   ) {
-    super(platform, accessory, client, state);
+    super(platform, accessory, state);
     this.service
       .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
       .onSet(async (value: CharacteristicValue) => {
@@ -52,7 +50,7 @@ export class ModeDevice extends BaseTvDevice {
     return 'Mode';
   }
 
-  protected isLightBulbEnabled(): boolean {
+  protected isLightbulbEnabled(): boolean {
     return this.platform.config.modeTvAccessoryLightbulb;
   }
 

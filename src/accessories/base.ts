@@ -7,36 +7,30 @@ import {
   WithUUID,
 } from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
-import { SyncBoxClient } from '../lib/client';
 import { PASSTHROUGH, POWER_SAVE } from '../lib/constants';
 
-export abstract class BaseHueSyncBoxDevice {
+export abstract class SyncBoxDevice {
   protected readonly platform: HueSyncBoxPlatform;
   public readonly accessory: PlatformAccessory;
-  protected readonly client: SyncBoxClient;
   protected state: State;
   protected service: Service;
-
-  tvAccessoryTypesToCategory: Record<string, number>;
 
   protected constructor(
     platform: HueSyncBoxPlatform,
     accessory: PlatformAccessory,
-    client: SyncBoxClient,
     state: State
   ) {
     this.platform = platform;
     this.accessory = accessory;
-    this.client = client;
     this.state = state;
 
     const existingService =
       this.getServiceSubType() !== undefined
         ? this.accessory.getService(this.getServiceType())
         : this.accessory.getServiceById(
-          this.getServiceType(),
+            this.getServiceType(),
             this.getServiceSubType() as string
-        );
+          );
 
     this.service =
       existingService ||
@@ -54,13 +48,6 @@ export abstract class BaseHueSyncBoxDevice {
     this.service
       .getCharacteristic(this.getPowerCharacteristic())
       .onSet(this.handlePowerCharacteristicSet.bind(this)); // SET - bind to the `setOn` method below
-
-    this.tvAccessoryTypesToCategory = {
-      settopbox: this.platform.api.hap.Categories.TV_SET_TOP_BOX,
-      tvstick: this.platform.api.hap.Categories.TV_STREAMING_STICK,
-      audioreceiver: this.platform.api.hap.Categories.AUDIO_RECEIVER,
-      television: this.platform.api.hap.Categories.TELEVISION,
-    };
 
     const accessoryInformationService =
       this.accessory.getService(this.platform.Service.AccessoryInformation) ||

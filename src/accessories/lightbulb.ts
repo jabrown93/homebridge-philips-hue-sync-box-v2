@@ -1,17 +1,16 @@
-import { BaseHueSyncBoxDevice } from './base';
+import { SyncBoxDevice } from './base';
 import type { PlatformAccessory } from 'homebridge';
 import { State } from '../state';
 import { HueSyncBoxPlatform } from '../platform';
 import { SyncBoxClient } from '../lib/client';
 
-export class LightbulbDevice extends BaseHueSyncBoxDevice {
+export class LightbulbDevice extends SyncBoxDevice {
   constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
-    protected client: SyncBoxClient,
     protected state: State
   ) {
-    super(platform, accessory, client, state);
+    super(platform, accessory, state);
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
     this.service.setCharacteristic(

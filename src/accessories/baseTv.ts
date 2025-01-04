@@ -1,16 +1,15 @@
-import { BaseHueSyncBoxDevice } from './base';
+import { SyncBoxDevice } from './base';
 import {
   type CharacteristicValue,
   PlatformAccessory,
   Service,
 } from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
-import { SyncBoxClient } from '../lib/client';
 import { State } from '../state';
 import { PASSTHROUGH, POWER_SAVE } from '../lib/constants';
 
-export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
-  protected lightBulbService?: Service;
+export abstract class BaseTvDevice extends SyncBoxDevice {
+  protected lightbulbService?: Service;
   protected inputServices: Service[] = [];
 
   protected readonly intensityToNumber: Map<string, number> = new Map([
@@ -44,12 +43,11 @@ export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
   constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
-    protected client: SyncBoxClient,
     protected state: State
   ) {
-    super(platform, accessory, client, state);
+    super(platform, accessory, state);
     this.createInputServices();
-    this.createLightBulbService();
+    this.createLightbulbService();
     this.service.setCharacteristic(
       this.platform.Characteristic.SleepDiscoveryMode,
       this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
@@ -61,35 +59,35 @@ export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
 
   protected abstract createInputServices(): void;
 
-  protected abstract isLightBulbEnabled(): boolean;
+  protected abstract isLightbulbEnabled(): boolean;
 
-  protected createLightBulbService(): void {
-    if (!this.isLightBulbEnabled()) {
+  protected createLightbulbService(): void {
+    if (!this.isLightbulbEnabled()) {
       return;
     }
-    this.lightBulbService =
+    this.lightbulbService =
       this.accessory.getService(this.platform.Service.Lightbulb) ||
       this.accessory.addService(this.platform.Service.Lightbulb);
 
     // Stores the light bulb service
 
     // Subscribes for changes of the on characteristic
-    this.lightBulbService
+    this.lightbulbService
       .getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOnLightBulb.bind(this));
+      .onSet(this.setOnLightbulb.bind(this));
 
     // Subscribes for changes of the brightness characteristic
-    this.lightBulbService
+    this.lightbulbService
       .getCharacteristic(this.platform.Characteristic.Brightness)
       .onSet(this.setBrightness.bind(this));
   }
 
-  setOnLightBulb(value: CharacteristicValue) {
-    if (!this.lightBulbService) {
+  setOnLightbulb(value: CharacteristicValue) {
+    if (!this.lightbulbService) {
       return;
     }
     this.platform.log.debug('Set On ->', value);
-    const currentVal = this.lightBulbService.getCharacteristic(
+    const currentVal = this.lightbulbService.getCharacteristic(
       this.platform.Characteristic.On
     ).value;
     return this.updateMode(currentVal, value);
@@ -222,17 +220,17 @@ export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
   public update(state: State): void {
     super.update(state);
     this.updateTv();
-    this.updateLightBulb();
+    this.updateLightbulb();
   }
 
   protected abstract updateTv(): void;
 
-  private updateLightBulb(): void {
-    if (!this.lightBulbService) {
+  private updateLightbulb(): void {
+    if (!this.lightbulbService) {
       return;
     }
     this.platform.log.debug('Updated state to ' + this.state.execution.mode);
-    this.lightBulbService.updateCharacteristic(
+    this.lightbulbService.updateCharacteristic(
       this.platform.Characteristic.On,
       this.state.execution.mode !== POWER_SAVE &&
         this.state.execution.mode !== PASSTHROUGH
@@ -240,7 +238,7 @@ export abstract class BaseTvDevice extends BaseHueSyncBoxDevice {
     this.platform.log.debug(
       'Updated brightness to ' + this.state.execution.brightness
     );
-    this.lightBulbService.updateCharacteristic(
+    this.lightbulbService.updateCharacteristic(
       this.platform.Characteristic.Brightness,
       Math.round((this.state.execution.brightness / 200.0) * 100)
     );

@@ -10,9 +10,25 @@ import type {
 } from 'homebridge';
 
 import { HueSyncBoxPlatformConfig } from './config';
-import { SyncBoxDevice } from './device';
 import { SyncBoxClient } from './lib/client';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
+import { State } from './state';
+import { SyncBoxDevice } from './accessories/base';
+import {
+  ENTERTAINMENT_TV_ACCESSORY,
+  INTENSITY_TV_ACCESSORY,
+  LIGHTBULB_ACCESSORY,
+  MODE_TV_ACCESSORY,
+  SWITCH_ACCESSORY,
+  TV_ACCESSORY,
+  TV_ACCESSORY_TYPES_TO_CATEGORY,
+} from './lib/constants';
+import { SwitchDevice } from './accessories/switch';
+import { LightbulbDevice } from './accessories/lightbulb';
+import { TvDevice } from './accessories/tv';
+import { ModeTvDevice } from './accessories/modeTv';
+import { IntensityTvDevice } from './accessories/intensityTv';
+import { EntertainmentTvDevice } from './accessories/entertainmentTv';
 
 export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -20,10 +36,11 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly config: HueSyncBoxPlatformConfig;
   public readonly HAP: HAP;
   public readonly accessories: Map<string, PlatformAccessory> = new Map();
+  public readonly devices: Array<SyncBoxDevice> = [];
+  public readonly externalAccessories: Array<PlatformAccessory> = [];
   public readonly log: Logging | Console;
   public readonly client: SyncBoxClient;
   public readonly api: API;
-  private device: SyncBoxDevice | undefined;
 
   constructor(
     public readonly logger: Logging,
@@ -36,7 +53,6 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     this.config = platformConfig as HueSyncBoxPlatformConfig;
     this.api = apiInput;
     this.log = logger ?? console;
-    this.log.debug('Config:', this.config);
     this.log.info('Initializing platform:', this.config.name);
 
     if (!this.config.syncBoxIpAddress || !this.config.syncBoxApiAccessToken) {
@@ -63,17 +79,14 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverDevices() {
-    this.log.debug('existing devices:', this.accessories);
     const state = await this.client.getState();
-    this.device = new SyncBoxDevice(this, state);
-    const devices = this.device.discoverDevices();
+    const accessories = this.discoverAccessories(state);
     // loop over the discovered devices and register each one if it has not already been registered
-    const uuids = devices.map(device => {
+    const uuids = accessories.map(accessory => {
       // generate a unique id for the accessory this should be generated from
       // something globally unique, but constant, for example, the device serial
       // number or MAC address
-      const newAccessory = device.accessory;
-      const uuid = device.accessory.UUID;
+      const uuid = accessory.UUID;
       this.log.debug('UUID:', uuid);
       this.log.debug('accessories contains:', this.accessories.has(uuid));
       // see if an accessory with the same uuid has already been registered and restored from
@@ -81,14 +94,18 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       const existingAccessory = this.accessories.get(uuid);
       if (existingAccessory) {
         this.log.debug(
-          'Updating existing accessory:',
+          'Restoring existing accessory from cache: ',
           existingAccessory.displayName
         );
+        const device = this.createDevice(existingAccessory, state);
+        this.devices.push(device);
         this.api.updatePlatformAccessories([existingAccessory]);
       } else {
-        this.log.info('Registering new accessory:', newAccessory.context.kind);
+        this.log.info('Registering new accessory:', accessory.context.kind);
+        const device = this.createDevice(accessory, state);
+        this.devices.push(device);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
-          newAccessory,
+          accessory,
         ]);
       }
       return uuid;
@@ -106,8 +123,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       }
     });
 
-    const externalAccessories = this.device.getExternalAccessories();
-    externalAccessories.forEach(externalAccessory => {
+    this.externalAccessories.forEach(externalAccessory => {
       const uuid = externalAccessory.UUID;
       const existingAccessory = this.accessories.get(uuid);
       if (!existingAccessory) {
@@ -115,11 +131,114 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       }
     });
 
-    this.device?.update(state);
+    await this.update(state);
     setInterval(async () => {
-      this.log.debug('Updating state');
       const state = await this.client.getState();
-      this.device?.update(state);
+      await this.update(state);
     }, this.config.updateInterval);
+  }
+
+  async update(state: State) {
+    this.log.debug('Updating state called');
+    for (const device of this.devices) {
+      this.log.debug('Updating device:', device.accessory.displayName);
+      device.update(state);
+    }
+  }
+
+  private discoverAccessories(state: State): PlatformAccessory[] {
+    this.log.debug('Discovering devices');
+    const accessories: PlatformAccessory[] = [];
+    const mainAccessory = this.createPlatformAccessory(
+      state,
+      this.config.baseAccessory === 'lightbulb' ? LIGHTBULB_ACCESSORY : SWITCH_ACCESSORY
+    );
+    accessories.push(mainAccessory);
+
+    if (this.config.tvAccessory) {
+      const tvAccessory = this.createTvAccessory(
+        state,
+        TV_ACCESSORY,
+        this.config.tvAccessoryType
+      );
+      accessories.push(tvAccessory);
+    }
+
+    if (this.config.modeTvAccessory) {
+      const accessory = this.createTvAccessory(
+        state,
+        MODE_TV_ACCESSORY,
+        this.config.modeTvAccessoryType
+      );
+      accessories.push(accessory);
+    }
+
+    if (this.config.intensityTvAccessory) {
+      const accessory = this.createTvAccessory(
+        state,
+        INTENSITY_TV_ACCESSORY,
+        this.config.intensityTvAccessoryType
+      );
+      accessories.push(accessory);
+    }
+
+    if (this.config.entertainmentTvAccessory) {
+      const accessory = this.createTvAccessory(
+        state,
+        ENTERTAINMENT_TV_ACCESSORY,
+        this.config.entertainmentTvAccessoryType
+      );
+      accessories.push(accessory);
+    }
+    return accessories;
+  }
+
+  private createPlatformAccessory(state: State, kind: string) {
+    this.log.debug('Creating new accessory with kind ' + kind + '.');
+    const accessory = new this.api.platformAccessory(
+      state.device.name,
+      this.api.hap.uuid.generate(kind)
+    );
+    if (kind === LIGHTBULB_ACCESSORY) {
+      accessory.category = this.api.hap.Categories.LIGHTBULB;
+    } else if (kind === SWITCH_ACCESSORY) {
+      accessory.category = this.api.hap.Categories.SWITCH;
+    }
+    accessory.context.kind = kind;
+    return accessory;
+  }
+
+  private createTvAccessory(
+    state: State,
+    accessoryName: string,
+    accessoryType: string
+  ) {
+    const accessory = this.createPlatformAccessory(state, accessoryName);
+    accessory.category = TV_ACCESSORY_TYPES_TO_CATEGORY[accessoryType];
+    this.externalAccessories.push(accessory);
+    return accessory;
+  }
+
+  private createDevice(
+    accessory: PlatformAccessory,
+    state: State
+  ): SyncBoxDevice {
+    const type = accessory.context.kind;
+    switch (type) {
+      case SWITCH_ACCESSORY:
+        return new SwitchDevice(this, accessory, state);
+      case LIGHTBULB_ACCESSORY:
+        return new LightbulbDevice(this, accessory, state);
+      case TV_ACCESSORY:
+        return new TvDevice(this, accessory, state);
+      case MODE_TV_ACCESSORY:
+        return new ModeTvDevice(this, accessory, state);
+      case INTENSITY_TV_ACCESSORY:
+        return new IntensityTvDevice(this, accessory, state);
+      case ENTERTAINMENT_TV_ACCESSORY:
+        return new EntertainmentTvDevice(this, accessory, state);
+      default:
+        throw new Error('Unknown accessory type: ' + type);
+    }
   }
 }

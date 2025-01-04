@@ -2,17 +2,15 @@ import type { PlatformAccessory } from 'homebridge';
 
 import { HueSyncBoxPlatform } from '../platform';
 import { State } from '../state';
-import { SyncBoxClient } from '../lib/client';
-import { BaseHueSyncBoxDevice } from './base';
+import { SyncBoxDevice } from './base';
 
-export class SwitchDevice extends BaseHueSyncBoxDevice {
+export class SwitchDevice extends SyncBoxDevice {
   constructor(
     protected readonly platform: HueSyncBoxPlatform,
     public readonly accessory: PlatformAccessory,
-    protected client: SyncBoxClient,
     protected state: State
   ) {
-    super(platform, accessory, client, state);
+    super(platform, accessory, state);
   }
 
   protected getPowerCharacteristic() {
