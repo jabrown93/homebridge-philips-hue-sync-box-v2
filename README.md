@@ -107,10 +107,7 @@ Hints:
       "intensityTvAccessoryLightbulb": false,
       "entertainmentTvAccessory": false,
       "entertainmentTvAccessoryType": "tv",
-      "entertainmentTvAccessoryLightbulb": false,
-      "isApiEnabled": false,
-      "apiPort": 40220,
-      "apiToken": "<YOUR-TOKEN>"
+      "entertainmentTvAccessoryLightbulb": false
     }
   ]
 }

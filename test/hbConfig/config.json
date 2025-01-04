@@ -38,13 +38,6 @@
             "entertainmentTvAccessory": false,
             "entertainmentTvAccessoryType": "TV",
             "entertainmentTvAccessoryLightbulb": false,
-            "isApiEnabled": false,
-            "_bridge": {
-                "name": "Living Room Sync Box",
-                "username": "0E:41:FB:40:CB:B6",
-                "manufacturer": "Philips",
-                "model": "Hue HDMI Sync Box 2.1"
-            },
             "platform": "PhilipsHueSyncBoxPlatform"
         }
     ],
