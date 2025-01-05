@@ -1,4 +1,4 @@
-import type { CharacteristicValue, PlatformAccessory } from 'homebridge';
+import type { PlatformAccessory } from 'homebridge';
 import { HueSyncBoxPlatform } from '../platform';
 import { State } from '../state';
 import { BaseTvDevice } from './baseTv';
@@ -10,14 +10,6 @@ export class EntertainmentTvDevice extends BaseTvDevice {
     protected state: State
   ) {
     super(platform, accessory, state);
-
-    this.service.setCharacteristic(
-      this.platform.Characteristic.SleepDiscoveryMode,
-      this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE
-    );
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Active)
-      .onSet(this.setOn.bind(this));
     this.service
       .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
       .onSet(async value => {
@@ -67,25 +59,6 @@ export class EntertainmentTvDevice extends BaseTvDevice {
       this.platform.Characteristic.ActiveIdentifier,
       index
     );
-  }
-
-  setOn(value: CharacteristicValue) {
-    this.platform.log.debug('Set On ->', value);
-    const currentVal = this.service.getCharacteristic(
-      this.platform.Characteristic.Active
-    ).value;
-    return this.updateMode(currentVal, value);
-  }
-
-  setOnLightbulb(value: CharacteristicValue) {
-    if (!this.lightbulbService) {
-      return;
-    }
-    this.platform.log.debug('Set On ->', value);
-    const currentVal = this.lightbulbService.getCharacteristic(
-      this.platform.Characteristic.On
-    ).value;
-    return this.updateMode(currentVal, value);
   }
 
   protected getSuffix(): string {
