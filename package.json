@@ -50,35 +50,35 @@
     "test": "echo \"Error: no test specified\" && exit 0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^17.0.3",
-    "@commitlint/config-conventional": "^17.0.3",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.17.0",
-    "@semantic-release/changelog": "^6.0.1",
-    "@semantic-release/commit-analyzer": "^9.0.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^8.0.2",
+    "@semantic-release/github": "^11.0.1",
     "@semantic-release/npm": "^12.0.1",
-    "@semantic-release/release-notes-generator": "^10.0.3",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "@types/eslint__js": "^8.42.3",
-    "@types/node": "^22.8.6",
+    "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "cross-env": "^7.0.3",
-    "eslint": "^9.14.0",
+    "eslint": "^9.17.0",
     "homebridge": "^2.0.0-beta.23",
-    "homebridge-config-ui-x": "^4.67.1-beta.18",
-    "nodemon": "^3.1.7",
+    "homebridge-config-ui-x": "^5.0.0-beta.32",
+    "nodemon": "^3.1.9",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3",
-    "typescript-eslint": "^8.12.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.1"
   },
   "dependencies": {
-    "homebridge-lib": "^7.1.0",
+    "homebridge-lib": "^7.1.1",
     "node-fetch": "^3.3.2"
   }
 }
