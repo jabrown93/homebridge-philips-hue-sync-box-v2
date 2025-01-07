@@ -11,8 +11,9 @@
 </span>
 
 [![npm version](https://badgen.net/npm/v/@jabrown93/homebridge-philips-hue-sync-box?color=purple&icon=npm&label)](https://www.npmjs.com/package/@jabrown93/homebridge-philips-hue-sync-box)
-[![npm downloads](https://badgen.net/github/last-commit/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
-[![npm version](https://badgen.net/github/stars/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
+[![npm downloads](https://badgen.net/npm/dw/@jabrown93/homebridge-philips-hue-sync-box?color=purple&icon=npm&label)](https://www.npmjs.com/package/@jabrown93/homebridge-philips-hue-sync-box)
+[![GitHub Stars](https://badgen.net/github/stars/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
+[![GitHub Last Commit](https://badgen.net/github/last-commit/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/jabrown93/homebridge-philips-hue-sync-box-v2.svg)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/pulls)
 [![GitHub issues](https://img.shields.io/github/issues/jabrown93/homebridge-philips-hue-sync-box-v2.svg)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/issues)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2?ref=badge_shield&issueType=license)[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2?ref=badge_shield&issueType=security)
