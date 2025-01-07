@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.6](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/compare/v2.0.5...v2.0.6) (2025-01-07)
+
+### Bug Fixes
+
+* mismatched license info ([96a45b0](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/commit/96a45b01e53aa28ae0f1f81373056bc89180e2a4))
+
 ## [2.0.5](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/compare/v2.0.4...v2.0.5) (2025-01-07)
 
 ### Bug Fixes
