@@ -10,11 +10,14 @@
 
 </span>
 
-![NPM Downloads](https://img.shields.io/npm/dw/@jabrown93/homebridge-philips-hue-sync-box)
-![NPM Version (with dist tag)](https://img.shields.io/npm/v/@jabrown93/homebridge-philips-hue-sync-box/latest)
-![NPM License](https://img.shields.io/npm/l/@jabrown93/homebridge-philips-hue-sync-box)
+[![npm version](https://badgen.net/npm/v/@jabrown93/homebridge-philips-hue-sync-box?color=purple&icon=npm&label)](https://www.npmjs.com/package/@jabrown93/homebridge-philips-hue-sync-box)
+[![npm downloads](https://badgen.net/github/last-commit/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
+[![npm version](https://badgen.net/github/stars/jabrown93/homebridge-philips-hue-sync-box-v2?color=cyan&icon=github)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/jabrown93/homebridge-philips-hue-sync-box-v2.svg)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/pulls)
+[![GitHub issues](https://img.shields.io/github/issues/jabrown93/homebridge-philips-hue-sync-box-v2.svg)](https://github.com/jabrown93/homebridge-philips-hue-sync-box-v2/issues)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2?ref=badge_shield&issueType=license)[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjabrown93%2Fhomebridge-philips-hue-sync-box-v2?ref=badge_shield&issueType=security)
 
-## Typescript rewrite of the [Homebridge Philips Hue Sync Box Plugin](https://github.com/lukasroegner/homebridge-philips-hue-sync-box) by [lukasroegner](https://github.com/lukasroegner).
+## Typescript rewrite of the [Homebridge Philips Hue Sync Box Plugin](https://github.com/lukasroegner/homebridge-philips-hue-sync-box-v2) by [lukasroegner](https://github.com/lukasroegner).
 
 Homebridge plugin for the Philips Hue Sync Box.
 
@@ -55,7 +58,7 @@ same pin as for the plugin).
 Install the plugin via npm:
 
 ```bash
-npm install @jabrown93/homebridge-philips-hue-sync-box -g
+npm install @jabrown93/homebridge-philips-hue-sync-box-v2 -g
 ```
 
 ## Prepare Sync Box
