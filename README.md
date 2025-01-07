@@ -206,24 +206,155 @@ The response is a JSON response, the following properties are included:
 
 ```
 {
-    groupId: '<group-number>',
-    mode: 'passthrough|powersave|video|game|music',
-    lastSyncMode: 'video|game|music',
-    brightness: 0-100,
-    hdmiSource: 'input1|input2|input3|input4',
-    options: {
-        video: {
-            intensity: 'subtle|moderate|high|intense',
-            backgroundLighting: true|false
-        },
-        game: {
-            intensity: 'subtle|moderate|high|intense',
-            backgroundLighting: true|false
-        },
-        music: {
-            intensity: 'subtle|moderate|high|intense'
-        }
-    }
+	"device": {
+		"name": "Living Room Sync Box",
+		"deviceType": "HSB2",
+		"uniqueId": "ID2",
+		"apiLevel": 10,
+		"firmwareVersion": "2.4.1",
+		"buildNumber": 784734914,
+		"termsAgreed": true,
+		"wifiState": "wan",
+		"ipAddress": "192.168.1.3",
+		"wifi": {
+			"ssid": "Guest Network",
+			"strength": 4
+		},
+		"lastCheckedUpdate": "2025-01-07T10:04:23Z",
+		"updatableBuildNumber": null,
+		"updatableFirmwareVersion": null,
+		"update": {
+			"autoUpdateEnabled": true,
+			"autoUpdateTime": 10
+		},
+		"ledMode": 1,
+		"action": "none",
+		"pushlink": "idle",
+		"capabilities": {
+			"maxIrCodes": 24,
+			"maxPresets": 16
+		},
+		"beta": false,
+		"overheating": false,
+		"undervolt": false,
+		"bluetooth": false
+	},
+	"hue": {
+		"bridgeUniqueId": "ID1",
+		"bridgeIpAddress": "192.168.1.2",
+		"groupId": "1",
+		"groups": {
+			"1": {
+				"name": "Living Room TV area",
+				"numLights": 1,
+				"active": true,
+				"owner": "HueSyncBox (ID2)"
+			},
+			"2": {
+				"name": "Bedroom TV area",
+				"numLights": 2,
+				"active": false
+			}
+		},
+		"connectionState": "streaming"
+	},
+	"execution": {
+		"mode": "video",
+		"syncActive": true,
+		"hdmiActive": true,
+		"hdmiSource": "input4",
+		"hueTarget": "1",
+		"brightness": 200,
+		"lastSyncMode": "video",
+		"video": {
+			"intensity": "moderate",
+			"backgroundLighting": true
+		},
+		"game": {
+			"intensity": "intense",
+			"backgroundLighting": false
+		},
+		"music": {
+			"intensity": "high",
+			"palette": "melancholicEnergetic"
+		},
+		"preset": null
+	},
+	"hdmi": {
+		"input1": {
+			"name": "HDMI 1",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input2": {
+			"name": "HDMI 2",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input3": {
+			"name": "HDMI 3",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input4": {
+			"name": "AVR",
+			"type": "avreceiver",
+			"status": "linked",
+			"lastSyncMode": "video"
+		},
+		"output": {
+			"name": "HDMI Out",
+			"type": "generic",
+			"status": "linked",
+			"lastSyncMode": "video"
+		},
+		"contentSpecs": "3840 x 2160 @ 60000 - SDR",
+		"videoSyncSupported": true,
+		"audioSyncSupported": true
+	},
+	"behavior": {
+		"inactivePowersave": 20,
+		"cecPowersave": 1,
+		"usbPowersave": 1,
+		"hpdInputSwitch": 1,
+		"hpdOutputEnableMs": 1500,
+		"arcBypassMode": 1,
+		"input1": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input2": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input3": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input4": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		}
+	},
+	"ir": {
+		"defaultCodes": true,
+		"scan": {
+			"scanning": false,
+			"code": null,
+			"codes": []
+		},
+		"codes": {}
+	},
+	"registrations": {
+	},
+	"presets": {}
 }
 ```
 
@@ -239,22 +370,46 @@ The body of the request has to be JSON and can contain any/some/all of the follo
 
 ```
 {
-    groupId: '<group-number>',
-    mode: 'passthrough|powersave|video|game|music',
-    brightness: 0-100,
-    hdmiSource: 'input1|input2|input3|input4',
-    options: {
-        video: {
-            intensity: 'subtle|moderate|high|intense',
-            backgroundLighting: true|false
-        },
-        game: {
-            intensity: 'subtle|moderate|high|intense',
-            backgroundLighting: true|false
-        },
-        music: {
-            intensity: 'subtle|moderate|high|intense'
-        }
-    }
+    "hue": {
+		"bridgeUniqueId": "ID1",
+		"bridgeIpAddress": "192.168.1.2",
+		"groupId": "1",
+		"groups": {
+			"1": {
+				"name": "Living Room TV area",
+				"numLights": 1,
+				"active": true,
+				"owner": "HueSyncBox (ID2)"
+			},
+			"56169ef5-be8e-4866-adce-ff3800aca35e": {
+				"name": "Bedroom TV area",
+				"numLights": 2,
+				"active": false
+			}
+		},
+		"connectionState": "streaming"
+	},
+	"execution": {
+		"mode": "video",
+		"syncActive": true,
+		"hdmiActive": true,
+		"hdmiSource": "input4",
+		"hueTarget": "1",
+		"brightness": 200,
+		"lastSyncMode": "video",
+		"video": {
+			"intensity": "moderate",
+			"backgroundLighting": true
+		},
+		"game": {
+			"intensity": "intense",
+			"backgroundLighting": false
+		},
+		"music": {
+			"intensity": "high",
+			"palette": "melancholicEnergetic"
+		},
+		"preset": null
+	}
 }
 ```
