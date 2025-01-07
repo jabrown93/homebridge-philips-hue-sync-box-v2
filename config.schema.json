@@ -153,12 +153,32 @@
         "required": false,
         "description": "Enables an integrated lightbulb for the TV Accessory."
       },
-      "updateInterval": {
+      "updateIntervalInSeconds": {
         "title": "Update Interval",
         "type": "integer",
-        "default": 60000,
+        "default": 5,
         "required": false,
-        "description": "The interval in milliseconds in which the plugin checks for updates."
+        "description": "The interval in seconds in which the plugin checks for updates."
+      },
+      "apiServerEnabled": {
+        "title": "Enable API",
+        "type": "boolean",
+        "default": false,
+        "required": false,
+        "description": "Enables an HTTP API for controlling the Sync Box."
+      },
+      "apiServerPort": {
+        "title": "API Port",
+        "type": "integer",
+        "default": "40220",
+        "required": false,
+        "description": "The port that the API (if enabled) runs on"
+      },
+      "apiServerToken": {
+        "title": "API Token",
+        "type": "string",
+        "required": false,
+        "description": " The token that has to be included in each request of the API. Is required if the API is enabled and has no default value."
       }
     }
   }

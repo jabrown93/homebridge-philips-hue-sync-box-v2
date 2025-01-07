@@ -20,5 +20,8 @@ export interface HueSyncBoxPlatformConfig extends PlatformConfig {
   entertainmentTvAccessory: boolean;
   entertainmentTvAccessoryType: tvAccessoryType;
   entertainmentTvAccessoryLightbulb: boolean;
-  updateInterval: number;
+  updateIntervalInSeconds: number;
+  apiServerPort: number;
+  apiServerToken: string;
+  apiServerEnabled: boolean;
 }

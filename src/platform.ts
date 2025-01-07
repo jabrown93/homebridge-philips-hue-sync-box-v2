@@ -29,6 +29,7 @@ import { TvDevice } from './accessories/tv';
 import { ModeTvDevice } from './accessories/modeTv';
 import { IntensityTvDevice } from './accessories/intensityTv';
 import { EntertainmentTvDevice } from './accessories/entertainmentTv';
+import { ApiServer } from './api-server';
 
 export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -46,6 +47,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     public readonly logger: Logging,
     public readonly platformConfig: PlatformConfig,
     public readonly apiInput: API
+
   ) {
     if (!apiInput) {
       throw new Error('API is not defined');
@@ -71,6 +73,11 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       this.log.debug('Executed didFinishLaunching callback');
       await this.discoverDevices();
     });
+
+    if(this.config.apiServerEnabled) {
+      const apiServer = new ApiServer(this);
+      apiServer.start();
+    }
   }
 
   configureAccessory(accessory: PlatformAccessory) {
@@ -135,7 +142,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     setInterval(async () => {
       const state = await this.client.getState();
       await this.update(state);
-    }, this.config.updateInterval);
+    }, this.config.updateIntervalInSeconds * 1000);
   }
 
   async update(state: State) {
