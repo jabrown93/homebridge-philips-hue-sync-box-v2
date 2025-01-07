@@ -47,7 +47,6 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
     public readonly logger: Logging,
     public readonly platformConfig: PlatformConfig,
     public readonly apiInput: API
-
   ) {
     if (!apiInput) {
       throw new Error('API is not defined');
@@ -74,7 +73,7 @@ export class HueSyncBoxPlatform implements DynamicPlatformPlugin {
       await this.discoverDevices();
     });
 
-    if(this.config.apiServerEnabled) {
+    if (this.config.apiServerEnabled) {
       const apiServer = new ApiServer(this);
       apiServer.start();
     }

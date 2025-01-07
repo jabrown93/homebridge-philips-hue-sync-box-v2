@@ -183,11 +183,13 @@ entertainment areas. Defaults to `false`.
 This plugin also provides an HTTP API to control some features of the Sync Box. It has been created so that you can further automate the system with HomeKit shortcuts. Starting with iOS 13, you can use shortcuts for HomeKit automation. Those automations that are executed on the HomeKit coordinator (i.e. iPad, AppleTV or HomePod) also support HTTP requests, which means you can automate your Sync Box without annoying switches and buttons exposed in HomeKit.
 
 If the API is enabled, it can be reached at the specified port on the host of this plugin.
+
 ```
 http://<YOUR-HOST-IP-ADDRESS>:<apiPort>
 ```
 
 The token has to be specified as value of the `Authorization` header on each request:
+
 ```
 Authorization: <YOUR-TOKEN>
 ```
@@ -195,11 +197,13 @@ Authorization: <YOUR-TOKEN>
 ## API - GET
 
 Use the `state` endpoint to retrieve the state of the Sync Box. The HTTP method has to be `GET`:
+
 ```
 http://<YOUR-HOST-IP-ADDRESS>:<apiPort>/state
 ```
 
 The response is a JSON response, the following properties are included:
+
 ```
 {
     groupId: '<group-number>',
@@ -226,11 +230,13 @@ The response is a JSON response, the following properties are included:
 ## API - POST
 
 Use the `state` endpoint to set state of the Sync Box. The HTTP method has to be `POST`:
+
 ```
 http://<YOUR-HOST-IP-ADDRESS>:<apiPort>/state
 ```
 
 The body of the request has to be JSON and can contain any/some/all of the following values:
+
 ```
 {
     groupId: '<group-number>',
@@ -251,3 +257,4 @@ The body of the request has to be JSON and can contain any/some/all of the follo
         }
     }
 }
+```
