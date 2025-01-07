@@ -5,12 +5,12 @@
 
 version: 2
 updates:
-- package-ecosystem: npm
-  directory: '/'
-  schedule:
-    interval: daily
-    time: '04:00'
-  assignees:
-  - 'jabrown93'
-  reviewers:
-  - 'jabrown93'
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: daily
+      time: '04:00'
+    assignees:
+      - 'jabrown93'
+    reviewers:
+      - 'jabrown93'

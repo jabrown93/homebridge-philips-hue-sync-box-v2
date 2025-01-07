@@ -168,3 +168,248 @@ Defaults to `false`.
 
 **entertainmentTvAccessoryLightbulb** (optional): Enables an integrated lightbulb for the TV Accessory for switching the
 entertainment areas. Defaults to `false`.
+
+**updateIntervalInSeconds** (optional): The interval in seconds in which the plugin polls the Sync Box for updates. Defaults to
+`5`.
+
+**apiServerEnabled** (optional): Enables an HTTP API for controlling the Sync Box. Defaults to `false`. See **API** for more information.
+
+**apiServerPort** (optional): The port that the API (if enabled) runs on. Defaults to `40220`, please change this setting of the port is already in use.
+
+**apiServerToken** (optional): The token that has to be included in each request of the API. Is required if the API is enabled and has no default value.
+
+## API
+
+This plugin also provides an HTTP API to control some features of the Sync Box. It has been created so that you can further automate the system with HomeKit shortcuts. Starting with iOS 13, you can use shortcuts for HomeKit automation. Those automations that are executed on the HomeKit coordinator (i.e. iPad, AppleTV or HomePod) also support HTTP requests, which means you can automate your Sync Box without annoying switches and buttons exposed in HomeKit.
+
+If the API is enabled, it can be reached at the specified port on the host of this plugin.
+
+```
+http://<YOUR-HOST-IP-ADDRESS>:<apiPort>
+```
+
+The token has to be specified as value of the `Authorization` header on each request:
+
+```
+Authorization: <YOUR-TOKEN>
+```
+
+## API - GET
+
+Use the `state` endpoint to retrieve the state of the Sync Box. The HTTP method has to be `GET`:
+
+```
+http://<YOUR-HOST-IP-ADDRESS>:<apiPort>/state
+```
+
+The response is a JSON response, the following properties are included:
+
+```
+{
+	"device": {
+		"name": "Living Room Sync Box",
+		"deviceType": "HSB2",
+		"uniqueId": "ID2",
+		"apiLevel": 10,
+		"firmwareVersion": "2.4.1",
+		"buildNumber": 784734914,
+		"termsAgreed": true,
+		"wifiState": "wan",
+		"ipAddress": "192.168.1.3",
+		"wifi": {
+			"ssid": "Guest Network",
+			"strength": 4
+		},
+		"lastCheckedUpdate": "2025-01-07T10:04:23Z",
+		"updatableBuildNumber": null,
+		"updatableFirmwareVersion": null,
+		"update": {
+			"autoUpdateEnabled": true,
+			"autoUpdateTime": 10
+		},
+		"ledMode": 1,
+		"action": "none",
+		"pushlink": "idle",
+		"capabilities": {
+			"maxIrCodes": 24,
+			"maxPresets": 16
+		},
+		"beta": false,
+		"overheating": false,
+		"undervolt": false,
+		"bluetooth": false
+	},
+	"hue": {
+		"bridgeUniqueId": "ID1",
+		"bridgeIpAddress": "192.168.1.2",
+		"groupId": "1",
+		"groups": {
+			"1": {
+				"name": "Living Room TV area",
+				"numLights": 1,
+				"active": true,
+				"owner": "HueSyncBox (ID2)"
+			},
+			"2": {
+				"name": "Bedroom TV area",
+				"numLights": 2,
+				"active": false
+			}
+		},
+		"connectionState": "streaming"
+	},
+	"execution": {
+		"mode": "video",
+		"syncActive": true,
+		"hdmiActive": true,
+		"hdmiSource": "input4",
+		"hueTarget": "1",
+		"brightness": 200,
+		"lastSyncMode": "video",
+		"video": {
+			"intensity": "moderate",
+			"backgroundLighting": true
+		},
+		"game": {
+			"intensity": "intense",
+			"backgroundLighting": false
+		},
+		"music": {
+			"intensity": "high",
+			"palette": "melancholicEnergetic"
+		},
+		"preset": null
+	},
+	"hdmi": {
+		"input1": {
+			"name": "HDMI 1",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input2": {
+			"name": "HDMI 2",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input3": {
+			"name": "HDMI 3",
+			"type": "generic",
+			"status": "unplugged",
+			"lastSyncMode": "video"
+		},
+		"input4": {
+			"name": "AVR",
+			"type": "avreceiver",
+			"status": "linked",
+			"lastSyncMode": "video"
+		},
+		"output": {
+			"name": "HDMI Out",
+			"type": "generic",
+			"status": "linked",
+			"lastSyncMode": "video"
+		},
+		"contentSpecs": "3840 x 2160 @ 60000 - SDR",
+		"videoSyncSupported": true,
+		"audioSyncSupported": true
+	},
+	"behavior": {
+		"inactivePowersave": 20,
+		"cecPowersave": 1,
+		"usbPowersave": 1,
+		"hpdInputSwitch": 1,
+		"hpdOutputEnableMs": 1500,
+		"arcBypassMode": 1,
+		"input1": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input2": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input3": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		},
+		"input4": {
+			"cecInputSwitch": 1,
+			"hpdInputPortSwitch": 1,
+			"linkAutoSync": 0
+		}
+	},
+	"ir": {
+		"defaultCodes": true,
+		"scan": {
+			"scanning": false,
+			"code": null,
+			"codes": []
+		},
+		"codes": {}
+	},
+	"registrations": {
+	},
+	"presets": {}
+}
+```
+
+## API - POST
+
+Use the `state` endpoint to set state of the Sync Box. The HTTP method has to be `POST`:
+
+```
+http://<YOUR-HOST-IP-ADDRESS>:<apiPort>/state
+```
+
+The body of the request has to be JSON and can contain any/some/all of the following values:
+
+```
+{
+    "hue": {
+		"bridgeUniqueId": "ID1",
+		"bridgeIpAddress": "192.168.1.2",
+		"groupId": "1",
+		"groups": {
+			"1": {
+				"name": "Living Room TV area",
+				"numLights": 1,
+				"active": true,
+				"owner": "HueSyncBox (ID2)"
+			},
+			"56169ef5-be8e-4866-adce-ff3800aca35e": {
+				"name": "Bedroom TV area",
+				"numLights": 2,
+				"active": false
+			}
+		},
+		"connectionState": "streaming"
+	},
+	"execution": {
+		"mode": "video",
+		"syncActive": true,
+		"hdmiActive": true,
+		"hdmiSource": "input4",
+		"hueTarget": "1",
+		"brightness": 200,
+		"lastSyncMode": "video",
+		"video": {
+			"intensity": "moderate",
+			"backgroundLighting": true
+		},
+		"game": {
+			"intensity": "intense",
+			"backgroundLighting": false
+		},
+		"music": {
+			"intensity": "high",
+			"palette": "melancholicEnergetic"
+		},
+		"preset": null
+	}
+}
+```
