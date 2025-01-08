@@ -1,6 +1,6 @@
 name: FOSSA scan
 
-on: push
+on: [push, pull_request]
 
 jobs:
   fossa-scan:

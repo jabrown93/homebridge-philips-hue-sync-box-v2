@@ -45,7 +45,7 @@
     "build": "rimraf ./dist && npm-run-all clean compile",
     "watch": "npm run build && npm link && nodemon",
     "prepublishOnly": "npm-run-all prettier lint build",
-    "semantic-release": "cross-env HUSKY=0 semantic-release --no-ci",
+    "semantic-release": "cross-env semantic-release --no-ci",
     "release": "npm-run-all build semantic-release",
     "test": "echo \"Error: no test specified\" && exit 0"
   },
