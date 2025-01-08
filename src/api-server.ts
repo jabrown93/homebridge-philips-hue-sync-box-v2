@@ -78,7 +78,11 @@ export class ApiServer {
     } catch (e) {
       this.platform.log.error('Error while getting the state.', e);
       response.statusCode = 500;
-      response.write(JSON.stringify({ error: 'An error occurred while processing your request.' }));
+      response.write(
+        JSON.stringify({
+          error: 'An error occurred while processing your request.',
+        })
+      );
     } finally {
       response.end();
     }
@@ -121,7 +125,11 @@ export class ApiServer {
     } catch (e) {
       this.platform.log.error('Error while updating the state.', e);
       response.statusCode = 500;
-      response.write(JSON.stringify({ error: 'An error occurred while processing your request.' }));
+      response.write(
+        JSON.stringify({
+          error: 'An error occurred while processing your request.',
+        })
+      );
     } finally {
       response.end();
     }
